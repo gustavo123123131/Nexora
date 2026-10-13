@@ -6,6 +6,10 @@ No button claims to start a browser in this deployment.
 import hashlib
 import hmac
 import os
+import re
+import urllib.error
+import urllib.request
+from urllib.parse import urlsplit
 
 from flask import Flask, jsonify, make_response, request
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -75,7 +79,9 @@ def guard():
         limit = 256 * 1024 if request.path == '/api/import' else 8192
         if size is None or size > limit or size < 0:
             return _reply({'error': 'Conteúdo inválido ou muito grande.'}, 413)
-    if request.path == '/api/health':
+    if request.path == '/api/health' or request.path.startswith('/api/runner/'):
+        # Remote runner has its OWN high-entropy authorization key. No password
+        # for localStorage-only profile metadata.
         return None
     if _config() is None:
         return _reply({'error': 'Configure DATABASE_URL, NEXORA_ACCESS_PASSWORD (12+ caracteres) e NEXORA_SESSION_SECRET (32+ caracteres) na Vercel.'}, 503)
@@ -152,3 +158,65 @@ def api_route(route):
         # Do not expose database URLs, credentials or connection errors to the client.
         app.logger.exception('Nexora cloud data operation failed')
         return _reply({'error': 'Falha no banco de dados. Verifique a configuração e os logs da Vercel.'}, 503)
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+@app.route('/api/runner/<path:route>', methods=['GET', 'POST'])
+def remote_runner(route):
+    """Vercel HTTPS proxy; no CORS and no secret embedded in frontend code.
+
+    Never allow arbitrary URLs or redirects: this holds session credentials.
+    """
+    base = os.environ.get('NEXORA_RUNNER_URL', '').rstrip('/')
+    if route == 'config':
+        return _reply({'configured': _valid_runner_base(base)})
+    if not _valid_runner_base(base):
+        return _reply({'error': 'Configure NEXORA_RUNNER_URL na Vercel para conectar o executor Chromium.'}, 503)
+    allowed_get = route == 'health' or bool(re.fullmatch(r'(status|frame)/[0-9a-f]{32}', route))
+    allowed_post = route in ('start', 'stop', 'act')
+    if not (allowed_get if request.method == 'GET' else allowed_post):
+        return _reply({'error': 'Operação do executor não encontrada.'}, 404)
+    token = request.headers.get('Authorization', '')
+    if not re.fullmatch(r'Bearer [A-Za-z0-9_\-!@#$%^&*+=:.]{32,256}', token):
+        return _reply({'error': 'Conecte a chave privada do executor antes de abrir perfis.'}, 401)
+    headers = {'Authorization': token, 'Accept': 'application/json, image/jpeg'}
+    body = request.get_data() if request.method == 'POST' else None
+    if body is not None:
+        headers['Content-Type'] = 'application/json'
+    upstream = urllib.request.Request(base + '/v1/' + route, data=body, headers=headers,
+                                      method=request.method)
+    try:
+        response = urllib.request.build_opener(_NoRedirect()).open(upstream, timeout=18)
+        with response:
+            content = response.read(1500001)
+            if len(content) > 1500000:
+                return _reply({'error': 'Resposta do executor acima do limite.'}, 502)
+            mime = response.headers.get('Content-Type', 'application/json')
+            if not mime.startswith(('application/json', 'image/jpeg')):
+                return _reply({'error': 'Resposta inesperada do executor.'}, 502)
+            return app.response_class(content, status=response.status, content_type=mime)
+    except urllib.error.HTTPError as exc:
+        try:
+            message = exc.read(8192).decode('utf-8')
+            import json
+            payload = json.loads(message)
+            error = str(payload.get('error', 'Erro do executor.'))[:300]
+        except Exception:
+            error = 'Falha na comunicação com executor.'
+        return _reply({'error': error}, exc.code if 400 <= exc.code < 600 else 502)
+    except (urllib.error.URLError, TimeoutError, OSError):
+        return _reply({'error': 'Executor indisponível. Confira o deploy no Railway.'}, 503)
+
+
+def _valid_runner_base(value):
+    try:
+        parsed = urlsplit(value)
+        return (parsed.scheme == 'https' and bool(parsed.hostname)
+                and not parsed.username and not parsed.password
+                and not parsed.path.strip('/') and not parsed.query and not parsed.fragment)
+    except ValueError:
+        return False
