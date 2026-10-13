@@ -8,3 +8,10 @@ __pycache__/
 !.env.example
 .vercel/
 *.log
+
+# Windows executor: never publish private key, cookies, sessions, venv or logs
+/runner/private/
+/runner/data/
+/runner/.venv-windows/
+/runner/.venv-runner/
+/runner/*.exe
