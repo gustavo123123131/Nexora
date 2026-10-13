@@ -79,7 +79,7 @@ function renderProfiles() {
     const unavailable = browserLocalMode ? !remoteReady : (profile.status === 'unavailable' || !browserAvailable);
     let actions = '';
     if (browserLocalMode && !remoteReady) {
-      actions = '<button class="btn btn-secondary" data-action="remote-connect">Conectar navegador</button>';
+      actions = `<button class="btn btn-secondary" data-action="remote-connect">Conectar navegador</button><button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     } else if (remoteReady) {
       actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'remote-stop' : 'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar' : (desktopReady ? '▶ Iniciar perfil' : '▶ Abrir')}</button>`;
       // Windows profiles are native Chromium windows, not iframe/screenshot previews.
