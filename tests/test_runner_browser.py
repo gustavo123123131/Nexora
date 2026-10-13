@@ -96,6 +96,11 @@ class DesktopChromiumConfigurationTests(unittest.TestCase):
             self.assertTrue(config['accept_downloads'])
             self.assertNotIn('locale', config)
             self.assertNotIn('timezone_id', config)
+            # This application does not configure a residential proxy;
+            # IP reputation belongs to the operating system/network.
+            self.assertNotIn('proxy', config)
+            self.assertFalse(any('--proxy-server' in flag
+                                 for flag in config['args']))
             self.assertTrue(any(flag.startswith('--window-size=')
                                 for flag in config['args']))
         with patch.object(runner_module, 'DESKTOP_MODE', False):
