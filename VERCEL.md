@@ -1,3 +1,37 @@
+# Nexora — modo gratuito Windows + Cloudflare Tunnel
+
+**Agora existe a alternativa sem Railway, sem servidor pago e sem domínio comprado.**
+O Nexora continua aberto pela Vercel, e o Chromium com sessões independentes roda
+no computador Windows do usuário, conectado por **Cloudflare Quick Tunnel**.
+
+1. Sincronize o repositório no GitHub Desktop (Fetch/Pull origin).
+2. Instale `cloudflared` no Windows, por exemplo com `winget install -e --id Cloudflare.cloudflared`.
+3. Na pasta do projeto, clique duas vezes em `INICIAR_EXECUTOR_WINDOWS.bat`.
+4. Aguarde a instalação de Flask, Playwright e Chromium na primeira execução.
+5. Copie da janela preta a URL temporária `https://...trycloudflare.com`.
+6. Acesse https://nexora-ebon-eight.vercel.app, clique **Conectar navegador**,
+   cole a URL e a chave privada gerada no Windows. A Vercel **não exige
+   NEXORA_RUNNER_URL nem redeploy** para esse fluxo.
+7. Clique em **Abrir** para iniciar Chromium isolado no perfil e
+   **Ver navegador** para retomar a janela. **Encerrar** salva os cookies no PC.
+
+Segurança: nunca envie a chave da janela preta a ninguém.
+Ela fica salva em `runner/private/runner-key.txt` e os perfis em
+`runner/data/profiles/`; ambas as pastas são excluídas pelo `.gitignore`.
+Seus dados antigos do modo localhost permanecem intocados.
+O servidor escuta apenas `127.0.0.1:8765`, e o Cloudflare publica
+um endereço HTTPS temporário autenticado por chave. O navegador na Vercel
+envia as chamadas ao túnel usando CORS restrito à origem do Nexora.
+
+**Limitação do modo gratuito:** o Windows e a janela do executor devem
+permanecer ligados. Quando o Quick Tunnel reinicia, a URL muda;
+é preciso reconectá-la pelo botão, sem alterar o GitHub/Vercel.
+Quick Tunnels não são serviço de produção com SLA.
+O sistema emula Pixel 7 com Chromium; não é Android real.
+Leia `runner/README.md` para detalhes.
+
+---
+
 # Nexora — Vercel: uso sem senha (versão de teste)
 
 ## Como funciona por padrão
