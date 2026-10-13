@@ -1,25 +1,41 @@
-/* Nexora remote Chrome viewer. Actions are authenticated and proxied via
- * Vercel to a persistent Chromium worker. No fake browser or iframe.
+/* Nexora remote Chromium viewer. Supports direct free Cloudflare Quick Tunnel
+ * (CORS restricted to the Nexora origin) and legacy Vercel proxy.
+ * Sessions run in a real Chromium worker, never in an iframe.
  */
 (() => {
   'use strict';
   const STORAGE_KEY = 'nexora.runner-key';
+  const TUNNEL_KEY = 'nexora.tunnel-url';
   const running = new Set();
   let secret = sessionStorage.getItem(STORAGE_KEY) || '';
+  let tunnelUrl = sessionStorage.getItem(TUNNEL_KEY) || '';
   let activeId = null;
   let configured = false;
   let objectUrl = null;
   let pollTimer = null;
   let busy = false;
 
+  function validateTunnelUrl(text) {
+    let parsed;
+    try { parsed = new URL(text); } catch (_) { throw new Error('Endereço do Cloudflare inválido.'); }
+    if (parsed.protocol !== 'https:' || !/^[a-z0-9-]+\.trycloudflare\.com$/i.test(parsed.hostname)
+      || parsed.username || parsed.password || parsed.port || parsed.pathname !== '/'
+      || parsed.search || parsed.hash) {
+      throw new Error('Cole somente a URL https://...trycloudflare.com gerada no Windows, sem caminhos ou parâmetros.');
+    }
+    return parsed.origin;
+  }
+
   const api = async (route, body, image = false) => {
+    if (route === 'config' && tunnelUrl) return {configured: true, direct: true};
+    const direct = Boolean(tunnelUrl);
     const headers = secret ? {Authorization: 'Bearer ' + secret} : {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await fetch('/api/runner/' + route, {
+    const response = await fetch(direct ? tunnelUrl + '/v1/' + route : '/api/runner/' + route, {
       method: body === undefined ? 'GET' : 'POST',
       headers,
       cache: 'no-store',
-      credentials: 'same-origin',
+      credentials: direct ? 'omit' : 'same-origin',
       body: body === undefined ? undefined : JSON.stringify(body)
     });
     if (!response.ok) {
@@ -52,9 +68,9 @@
       const config = await api('config');
       configured = Boolean(config.configured);
       if (!configured) {
-        document.querySelector('#runnerButton').title = 'Configure NEXORA_RUNNER_URL na Vercel e instale o executor em um servidor com armazenamento persistente.';
+        document.querySelector('#runnerButton').title = 'Inicie INICIAR_EXECUTOR_WINDOWS.bat no seu PC e conecte a URL do Cloudflare Tunnel.';
       }
-      if (secret) await authenticate();
+      if (secret && configured) await authenticate();
     } catch (error) {
       console.info('Executor do Nexora ainda não configurado.');
     }
@@ -69,31 +85,43 @@
   }
 
   async function connect() {
-    try {
-      configured = Boolean((await api('config')).configured);
-    } catch (_) { configured = false; }
-    if (!configured) {
-      alert('Ainda falta implantar o executor Chromium e configurar NEXORA_RUNNER_URL na Vercel. Sem isso, o botão Abrir não pode iniciar uma sessão isolada.');
-      return;
-    }
-    const value = prompt('Digite a chave privada NEXORA_RUNNER_KEY do seu executor Chromium (não é senha do painel):',
+    // Quick Tunnel uses a NEW URL whenever Windows restarts. Prompting for it
+    // here avoids Vercel environment-variable edits and redeployment.
+    const answer = prompt(
+      'Cole a URL https://...trycloudflare.com exibida pelo INICIAR_EXECUTOR_WINDOWS.bat:',
+      tunnelUrl || '');
+    if (answer === null) return;
+    let nextUrl;
+    try { nextUrl = validateTunnelUrl(answer.trim()); }
+    catch (error) { alert(error.message); return; }
+
+    const nextKey = prompt(
+      'Cole a chave NEXORA_RUNNER_KEY exibida no terminal do executor (não envie essa chave para ninguém):',
       secret || '');
-    if (value === null) return;
-    if (value.trim().length < 32) {
-      alert('A chave do executor deve ter ao menos 32 caracteres.');
+    if (nextKey === null) return;
+    if (nextKey.trim().length < 32) {
+      alert('A chave deve ter pelo menos 32 caracteres.');
       return;
     }
-    const old = secret;
-    secret = value.trim();
+
+    const oldUrl = tunnelUrl;
+    const oldKey = secret;
+    tunnelUrl = nextUrl;
+    secret = nextKey.trim();
+    remote.connected = false;
+    running.clear();
+    refreshPanel();
     try {
       await authenticate();
+      sessionStorage.setItem(TUNNEL_KEY, tunnelUrl);
       sessionStorage.setItem(STORAGE_KEY, secret);
-      alert('Executor Chromium conectado! Você já pode clicar em Abrir.');
+      alert('Conexão verificada! Clique em Abrir no perfil para iniciar o Chromium independente.');
     } catch (error) {
-      secret = old;
+      tunnelUrl = oldUrl;
+      secret = oldKey;
       remote.connected = false;
       refreshPanel();
-      alert('Não foi possível conectar o executor: ' + error.message);
+      alert('Falha ao conectar: ' + error.message + '. Verifique se o executor e a janela do túnel estão abertos.');
     }
   }
 
