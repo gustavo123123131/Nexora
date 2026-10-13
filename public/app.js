@@ -84,6 +84,7 @@ function renderProfiles() {
       actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'remote-stop' : 'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar' : (desktopReady ? '▶ Iniciar perfil' : '▶ Abrir')}</button>`;
       // Windows profiles are native Chromium windows, not iframe/screenshot previews.
       if (running && !desktopReady) actions += `<button class="btn btn-ghost" data-action="remote-view" data-id="${profile.id}">Ver navegador</button>`;
+      if (!running) actions += `<button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     } else if (unavailable) {
       actions = '<button class="btn btn-secondary" disabled>Navegador indisponível</button>';
     } else {
@@ -91,7 +92,7 @@ function renderProfiles() {
     }
     const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
     const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${browserLocalMode ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
 }
 function renderSites() {
@@ -105,12 +106,12 @@ function renderSites() {
 function openModal(kind, item) {
   const isSite = kind === 'site';
   $('#modal').hidden = false;
-  $('#modalTitle').textContent = isSite ? (item ? 'Editar site' : 'Adicionar site') : 'Novo perfil';
+  $('#modalTitle').textContent = isSite ? (item ? 'Editar site' : 'Adicionar site') : (item ? 'Editar perfil' : 'Novo perfil');
   $('#modalDescription').textContent = isSite ? 'Defina o nome e o endereço para abrir no navegador.' : 'Os perfis são independentes; abertura do navegador depende do executor.';
   $('#modalSubmit').textContent = item ? 'Salvar alterações' : (isSite ? 'Adicionar site' : 'Criar perfil');
   $('#modalFields').innerHTML = isSite
     ? `<div class="field"><label for="fieldName">Nome do site</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Site principal" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldUrl">Endereço (URL)</label><input id="fieldUrl" name="url" type="url" maxlength="2048" placeholder="https://exemplo.com" required value="${escapeHTML(item?.url || '')}"><div class="field-note">Use http:// ou https:// no endereço.</div></div>`
-    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}">${escapeHTML(site.name)}</option>`).join('')}</select><div class="field-note">${browserAvailable ? 'Chromium mobile · sessão persistente.' : 'Cadastro na nuvem · navegador remoto ainda não disponível.'}</div></div>`;
+    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}" ${item?.site_id === site.id ? 'selected' : ''}>${escapeHTML(site.name)}</option>`).join('')}</select></div>${browserLocalMode ? `<div class="field"><label for="fieldDevice">Modelo de celular (emulação Chromium)</label><select id="fieldDevice" name="device" required>${globalThis.NexoraBrowserStore.devices.map(device => `<option value="${escapeHTML(device)}" ${(item?.device || 'Pixel 7') === device ? 'selected' : ''}>${escapeHTML(device)}</option>`).join('')}</select><div class="field-note">Modelo salvo individualmente. Não é Android real.</div></div>` : ''}`;
   $('#modalForm').dataset.kind = kind;
   $('#modalForm').dataset.id = item?.id || '';
   $('#fieldName').focus();
@@ -147,6 +148,11 @@ document.addEventListener('click', async event => {
     return openModal('profile');
   }
   if (action === 'edit-site') return openModal('site', state.sites.find(s => s.id === id));
+  if (action === 'edit-profile' && browserLocalMode) {
+    if (globalThis.NexoraRemote?.isRunning(id))
+      return toast('Encerre o perfil antes de alterar seu dispositivo.', true);
+    return openModal('profile', state.profiles.find(p => p.id === id));
+  }
   if (action === 'visit') {
     const profile = state.profiles.find(p => p.id === id);
     const site = state.sites.find(s => s.id === profile?.site_id);
@@ -160,7 +166,7 @@ document.addEventListener('click', async event => {
     const profile = state.profiles.find(p => p.id === id);
     const site = state.sites.find(s => s.id === profile?.site_id);
     if (!site) return toast('Site não encontrado.', true);
-    return globalThis.NexoraRemote.start(id, site.url);
+    return globalThis.NexoraRemote.start(id, site.url, profile.device || 'Pixel 7');
   }
   if (action === 'remote-stop') return globalThis.NexoraRemote.stop(id);
   if (action === 'remote-view') return globalThis.NexoraRemote.view(id);
@@ -193,7 +199,8 @@ $('#modalForm').addEventListener('submit', async event => {
   const id = form.dataset.id;
   const name = $('#fieldName').value;
   const payload = kind === 'site' ? {name, url:$('#fieldUrl').value} : {name, site_id:$('#fieldSite').value};
-  const route = kind === 'site' ? (id ? 'sites/update':'sites/create') : 'profiles/create';
+  if (kind === 'profile' && browserLocalMode) payload.device = $('#fieldDevice').value;
+  const route = kind === 'site' ? (id ? 'sites/update':'sites/create') : (id ? 'profiles/update' : 'profiles/create');
   if (id) payload.id = id;
   const ok = await perform(route, payload, 'Salvo com sucesso.');
   if (ok) closeModal();
@@ -213,12 +220,12 @@ function updateEnvironment() {
   $('#cloudNotice p').textContent = browserLocalMode
     ? (globalThis.NexoraRemote?.connected
       ? (globalThis.NexoraRemote.desktop
-        ? 'Executor Windows conectado. Iniciar perfil abre uma janela real e independente do Chromium na área de trabalho; os dados e logins ficam separados no seu PC. A emulação mobile usa Pixel 7.'
+        ? 'Executor Windows conectado. Cada perfil abre uma janela real e independente do Chromium com o modelo de celular escolhido. Os dados e logins ficam separados no seu PC.'
         : 'Executor Chromium conectado: cada perfil tem uma sessão real separada. Os logins são guardados no volume persistente do executor, não na Vercel. O modo mobile é emulado.')
       : 'Perfis cadastrados neste navegador. Para fazer multi-login de verdade, conecte o executor Chromium remoto. A Vercel sozinha não mantém sessões independentes.')
     : 'Perfis e sites ficam no banco remoto, mas o navegador persistente exige um executor dedicado. A Vercel sozinha não abre sessões independentes.';
   $('.device-tile strong').textContent = browserAvailable ? 'Android Mobile' : 'Executor remoto';
-  $('.device-tile span:last-child').textContent = browserAvailable ? 'Pixel 7 · Chromium' : 'Não conectado';
+  $('.device-tile span:last-child').textContent = browserAvailable ? 'Modelos Android · Chromium' : 'Não conectado';
 }
 function showLogin(error='') {
   $('#mainShell').hidden = true;
