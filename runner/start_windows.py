@@ -135,8 +135,7 @@ def main():
 
             # Quick Tunnel uses no account, credit card or paid domain.
             events = queue.Queue()
-            tunnel = subprocess.Popen([cloudflared, 'tunnel', '--url', HEALTH.removesuffix('/healthz'),
-                                       '--no-autoupdate'],
+            tunnel = subprocess.Popen([cloudflared, 'tunnel', '--url', HEALTH.removesuffix('/healthz')],
                                       cwd=str(HOME), stdin=subprocess.DEVNULL,
                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                       text=True, encoding='utf-8', errors='replace')
