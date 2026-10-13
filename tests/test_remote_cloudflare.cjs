@@ -64,3 +64,24 @@ test('connects directly to temporary tunnel with Bearer key and no Vercel redepl
   assert.equal(scene.store.get('nexora.tunnel-url'),url);
   assert.equal(scene.store.get('nexora.runner-key'),key);
 });
+
+
+test('accepts the tunnel URL copied together with console labels', async () => {
+  const url = 'https://queue-julia-communist-exceptions.trycloudflare.com';
+  const key = 'a'.repeat(48);
+  const copied = 'URL DO TUNEL (cole em Conectar navegador no Nexora):\n' +
+    url + '\nCHAVE PRIVADA (nao compartilhar): [redacted]';
+  const scene = createSandbox([copied, key]);
+  await scene.remote.connect();
+  assert.equal(scene.remote.connected, true);
+  assert.equal(scene.records[0].target, url + '/v1/health');
+});
+
+test('accepts a trycloudflare hostname without https scheme', async () => {
+  const url = 'https://queue-julia-communist-exceptions.trycloudflare.com';
+  const key = 'a'.repeat(48);
+  const scene = createSandbox(['queue-julia-communist-exceptions.trycloudflare.com', key]);
+  await scene.remote.connect();
+  assert.equal(scene.remote.connected, true);
+  assert.equal(scene.records[0].target, url + '/v1/health');
+});
