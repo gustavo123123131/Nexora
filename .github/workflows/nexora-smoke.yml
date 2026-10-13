@@ -18,3 +18,17 @@ jobs:
         run: python -m compileall -q app.py cloud_store.py storage.py server.py browser_manager.py runner/worker.py
       - name: Check metadata storage and JavaScript
         run: node --test tests/test_browser_store.cjs
+  chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install runner and Chromium
+        run: |
+          pip install -r runner/requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Real browser profile isolation and persistence
+        run: python -m unittest discover -s tests -p test_runner_browser.py -v
