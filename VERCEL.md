@@ -1,63 +1,66 @@
-# Nexora — deploy na Vercel
+# Nexora — Vercel: uso sem senha (versão de teste)
 
-## O que funciona nesta hospedagem
+## Como funciona por padrão
 
-- Interface original em `public/`, pela URL HTTPS da Vercel, sem servidor local.
-- Cadastro, edição e exclusão de sites, criação e exclusão de perfis.
-- Persistência do **cadastro** em Postgres/Neon (não em disco temporário).
-- Login administrativo por senha definida no painel da Vercel; sessão HTTP-only assinada.
-- Importação opcional dos sites/perfis do antigo `data/settings.json` via tela de Sites.
+Abra o endereço HTTPS do projeto na Vercel. **Não é necessário configurar DATABASE_URL,
+NEXORA_ACCESS_PASSWORD nem NEXORA_SESSION_SECRET para usar o modo padrão.**
 
-**Não funciona apenas na Vercel:** abrir Chromium com janela interativa, gerenciar processos persistentes,
-executar Android real, guardar cookies/armazenamento de sites e logar nos sites usando esses perfis.
-A API devolve HTTP 501 para iniciar/encerrar navegadores; a interface mostra a indisponibilidade
-em vez de inventar uma sessão ativa. Para recuperar essas funções na nuvem, será necessário um
-**executor remoto de navegadores** persistente com armazenamento próprio e uma interface de acesso
-remoto segura (streaming da janela / navegador remoto). Esse componente não foi implementado.
+O Nexora permite:
+- Cadastrar, editar e excluir sites.
+- Cadastrar e excluir perfis.
+- Importar `settings.json` da versão antiga (somente nomes/URLs/IDs).
+- Visitar o site de um perfil em uma aba comum, com aviso claro de que **NÃO existe isolamento**.
 
-## Configuração na Vercel — uma vez
+Os cadastros ficam no `localStorage` **do navegador e da origem HTTPS usada**.
+Eles NÃO são salvos na Vercel nem sincronizados entre computadores ou outros
+navegadores. Alterar o domínio, limpar os dados do site ou navegar em modo
+anônimo pode fazer os cadastros desaparecerem. Faça backup dos seus dados.
+Não são armazenados cookies nem senhas de sites no Nexora.
 
-1. Faça backup do `data/` **no seu computador**; ele contém dados privados e não deve ser enviado.
-2. Vercel > **Add New > Project** > importar `gustavo123123131/Nexora`, branch `main`.
-3. **Framework Preset: Flask** (o arquivo `app.py` é a entrada da função); Root Directory: `./`.
-   Deixe o build command padrão. A pasta `public/` é entregue pela CDN da Vercel.
-4. No projeto, acesse **Storage** > adicione **Neon Postgres** (ou outro PostgreSQL externo).
-   Associe ao projeto para criar a variável `DATABASE_URL`.
-5. Em **Settings > Environment Variables**, crie:
-   - `NEXORA_ACCESS_PASSWORD`: senha forte privada com **12 ou mais caracteres**.
-   - `NEXORA_SESSION_SECRET`: string aleatória privada com **32 ou mais caracteres**;
-     pode gerar via um gerenciador de senhas. Não reutilize a senha de acesso.
-   - `DATABASE_URL`: normalmente criada automaticamente pela integração Neon.
-6. Se configurar as variáveis após o primeiro deploy, use **Redeploy**.
-7. Acesse sua URL HTTPS, faça login e cadastre sites e perfis. O esquema das duas tabelas
-   (`nexora_sites` e `nexora_profiles`) é inicializado automaticamente no primeiro acesso ao banco.
+Para acessar esse modo, use a URL normal da implantação, sem parâmetros.
+O formulário de senha NÃO aparece neste modo.
 
-### Importar a configuração antiga, sem copiar cookies
+**ATENÇÃO: ISTO NÃO É MULTI-LOGIN FUNCIONAL.** Uma aba comum compartilha cookies com
+as demais abas do mesmo perfil de Chrome. Para abrir duas contas no mesmo site
+com autenticação realmente separada, será preciso um executor externo de
+navegadores persistentes com isolamento e streaming das sessões. A Vercel
+serverless, sozinha, não é esse executor. Nenhum teste real de isolamento
+remoto pode ser considerado aprovado neste estágio.
 
-Após logar: **Sites cadastrados > Importar settings.json**. Escolha um backup do arquivo
-`data/settings.json` do PC. O sistema importa apenas nomes, URLs e IDs de perfis/sites, de
-maneira transacional, sem sobrescrever entradas com IDs existentes. Não envia nem salva pastas
-`data/profiles`, cookies ou dados de login. Os logins locais **não migram** para a Vercel.
+## Modo legado opcional: PostgreSQL e senha
 
-O arquivo `data/settings.json` já havia sido enviado ao histórico GitHub antes desta alteração.
-Ele NÃO é usado como banco remoto e foi excluído do bundle da Vercel via `.vercelignore`.
-**Não removemos esse arquivo rastreado neste commit** para não arriscar apagar uma cópia local
-existente durante um `git pull`. Depois de fazer backup, remova-o do controle de versão
-com `git rm --cached data/settings.json` e faça commit, entendendo que clones antigos devem
-preservar seus próprios dados antes de sincronizar. Histórico público anterior pode persistir.
-Recomenda-se tornar o repositório privado.
+O backend antigo continua disponível sem perder os cadastros existentes.
+Para usá-lo explicitamente, acesse a URL com `?storage=cloud` e configure na Vercel:
+- `DATABASE_URL` (ou `POSTGRES_URL`): PostgreSQL externo (por exemplo Neon).
+- `NEXORA_ACCESS_PASSWORD`: senha com ao menos 12 caracteres.
+- `NEXORA_SESSION_SECRET`: segredo aleatório com ao menos 32 caracteres.
 
-## Execução anterior no Windows (opcional)
+Esse modo continua protegido por senha. Não remova sua autenticação e
+NÃO publique o banco de dados sem proteção. Dados dos modos
+"neste navegador" e "PostgreSQL" são separados, sem sincronização automática.
 
-`INICIAR.bat` e `server.py` permanecem apenas para compatibilidade com a versão local antiga;
-eles usam `requirements-local.txt` e **não são necessários para acessar a Vercel**. A cópia
-local não sincroniza automaticamente com o cadastro no Postgres.
+## Implantação
 
-## Testes e limites
+1. Vercel > Add New > Project > importe `gustavo123123131/Nexora` (branch `main`).
+2. Preset: Flask; Root Directory `./`. Arquivos estáticos em `public/`.
+3. Implante ou, se o projeto já estiver vinculado ao GitHub, aguarde o deploy automático.
+4. Abra a URL HTTPS da Vercel. O painel deve abrir no modo sem senha.
+5. Na aba Sites, o botão "Importar settings.json" pode carregar os cadastros
+   do projeto anterior para este navegador. Não transfere cookies/sessões.
+6. Se aparecer uma versão antiga, confirme o sucesso do último deploy,
+   faça uma atualização forçada (Ctrl+F5) e verifique o endereço.
 
-- `python -m unittest discover -s tests -p test_cloud.py -v`: autenticação/rotas usando store de teste, sem DB externo.
-- Validação do GitHub/Vercel em produção requer deploy com variáveis e banco reais.
-- Um teste completo de Postgres/Neon e do frontend hospedado só pode ser realizado depois de
-  conectar a conta na Vercel. Nunca deixe um deploy público sem configurar a senha.
-- Não existe executor de navegador, browser streaming, backup dos cookies ou conversão real
-  Android. APIs futuras deverão exigir autenticação e autorização adequadas.
+Arquivos de `data/`, `data/profiles/`, `.venv/` e cookies locais não devem ser
+enviados ao GitHub. O repositório está público: recomenda-se torná-lo privado,
+principalmente porque há um `data/settings.json` antigo no histórico.
+Nenhum dado do banco remoto anterior ou da pasta local foi apagado por esta mudança.
+
+## Verificações e limitações
+
+- Sintaxe JavaScript das duas partes validada em ambiente V8.
+- Testes de lógica do armazenamento simulando o navegador: criação,
+  persistência, importação, validação e exclusão.
+- Navegação real, integração Vercel em produção e sessões Chromium remotas:
+  **não testadas**; as sessões remotas ainda não estão implementadas.
+- O modo local antigo do Windows permanece nos arquivos `server.py`,
+  `browser_manager.py` e `INICIAR.bat` para não remover funcionalidades existentes.
