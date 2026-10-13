@@ -64,3 +64,47 @@ Nenhum dado do banco remoto anterior ou da pasta local foi apagado por esta muda
   **não testadas**; as sessões remotas ainda não estão implementadas.
 - O modo local antigo do Windows permanece nos arquivos `server.py`,
   `browser_manager.py` e `INICIAR.bat` para não remover funcionalidades existentes.
+
+
+## Abrir perfis reais: executor remoto persistente
+
+O painel da Vercel agora possui **Conectar navegador**, **Abrir**, **Ver navegador**
+e **Encerrar**. Esses botões só passam a controlar sessões reais depois de
+hospedar o serviço em `runner/` e conectá-lo à Vercel.
+
+A **Vercel sozinha não é suficiente** para executar um navegador interativo
+persistente e salvar cookies de vários perfis. Cada perfil do executor
+usa `/data/profiles/<id>` e um contexto Chromium separado. A visualização
+é feita por capturas JPEG sequenciais e ações enviadas pelo painel;
+isso não é Android nativo nem streaming de vídeo perfeito.
+
+Implantação manual (sem plugins):
+1. Use um serviço que suporte Docker, execução persistente e volume.
+   Exemplo: Railway > New Project > Deploy from GitHub `Nexora`,
+   Root Directory `/runner` (detectará `runner/Dockerfile`).
+2. Monte volume persistente em `/data` e mantenha
+   `NEXORA_PROFILE_DIR=/data/profiles`.
+3. Configure `NEXORA_RUNNER_KEY` como segredo aleatório de no mínimo
+   32 caracteres (exemplo de geração local: `python -c "import secrets; print(secrets.token_urlsafe(48))"`).
+   Não escreva a chave no repositório, nem mande para conversas públicas.
+4. Gere um domínio público HTTPS para o executor.
+5. Na Vercel, Environment Variables: `NEXORA_RUNNER_URL=https://DOMINIO-DO-EXECUTOR`
+   sem barra final. Faça Redeploy.
+6. Abra a URL Nexora, clique **Conectar navegador**, digite a chave privada
+   e clique em **Abrir** em um perfil.
+7. **Ver navegador** mostra a janela mobile para clicar, digitar, Tab,
+   Enter, scroll e voltar. **Encerrar** fecha o processo preservando
+   cookies no volume. Uma reinicialização do executor fecha navegadores
+   ativos, mas não deve perder os perfis se o volume permanecer.
+
+**Segurança:** mantenha a chave privada. O executor não fica exposto
+sem autenticação, embora o endereço da interface seja público.
+A versão atual do Docker usa Chromium sem sandbox em um contêiner;
+evite navegar em sites não confiáveis. Para produção, devemos isolar melhor
+o executor e definir limites de acesso e recursos.
+
+**Custo e validação:** serviço persistente com armazenamento pode exigir
+pagamento; nenhum preço ou gratuidade é garantido. Os testes do GitHub
+podem validar a lógica do Chromium; ainda é necessário testar a implantação
+e o login com suas contas reais. Dados do modo local no Windows
+não migram automaticamente ao executor remoto.
