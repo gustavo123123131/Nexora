@@ -50,10 +50,16 @@ class ChromiumRunnerTests(unittest.TestCase):
                         self.assertNotIn('first_profile', c2)
                         self.assertIn('second_profile', c2)
                         self.assertNotIn('second_profile', c1)
-                        screenshot = manager.run('frame', first)
-                        self.assertTrue(screenshot.startswith(b'\\xff\\xd8') or
-                                        screenshot.startswith(bytes([0xff, 0xd8])))
-                        self.assertGreater(len(screenshot), 1000)
+                        if runner_module.DESKTOP_MODE:
+                            # Visible Chromium windows are used directly:
+                            # validate a live interactive page, not screenshot streaming.
+                            page = manager.run('_page_url_for_test', first)
+                            self.assertEqual(page['url'], base + '/first')
+                            self.assertEqual(page['input_count'], 1)
+                        else:
+                            screenshot = manager.run('frame', first)
+                            self.assertTrue(screenshot.startswith(bytes([0xff, 0xd8])))
+                            self.assertGreater(len(screenshot), 1000)
                         self.assertTrue(manager.run('stop', first)['running'] is False)
                         self.assertTrue(manager.run('start', first, base + '/plain')['running'])
                         self.assertIn('first_profile', manager.run('_cookie_names_for_test', first))
