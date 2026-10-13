@@ -1,3 +1,52 @@
+# Janelas reais do Chromium no Windows — Nexora
+
+**Novo comportamento (Windows):** **Iniciar perfil** abre uma janela nativa
+visível do Chromium na sua área de trabalho. Não há iframe e não aparece a
+visualização de screenshots dentro da Vercel. A janela pode ser arrastada,
+minimizada, maximizada e redimensionada. Mouse, teclado, barra de endereços
+e navegação funcionam diretamente no Chromium.
+
+Cada perfil continua usando um diretório exclusivo em
+`runner/data/profiles/<id>`, com Chromium persistente e cookies separados.
+O preset Playwright **Pixel 7** configura user-agent Android, viewport,
+escala e toque emulados (não é um Android real). Como se trata de uma
+emulação mobile com viewport fixo, redimensionar a janela do sistema não
+necessariamente muda o tamanho do viewport emulado.
+
+## Atualizar e usar no PC em que o executor já está instalado
+
+1. No Nexora, clique **Encerrar** nos perfis abertos; depois pressione
+   **Ctrl+C** na janela preta do executor para parar o processo antigo.
+2. Abra um **PowerShell** e execute:
+   `cd "$HOME\Nexora-GitHub"`
+   `git pull`
+   `.\INICIAR_EXECUTOR_WINDOWS.bat`
+3. O iniciador vai mostrar uma **NOVA** URL temporária Cloudflare.
+   Mantenha a janela preta aberta.
+4. Acesse https://nexora-ebon-eight.vercel.app e recarregue com **Ctrl+F5**.
+   Clique **Conectar navegador**, cole a nova URL e a chave privada que
+   já existe no seu Windows (não a envie em chats).
+5. Clique **Iniciar perfil**. A janela real do Chromium aparecerá na
+   área de trabalho do Windows. Para gerenciar o perfil, volte ao painel
+   usando Alt+Tab ou a barra de tarefas; clique **Encerrar** para fechar
+   e salvar a sessão. Abra perfis diferentes para ter janelas independentes.
+
+**Importante:** a Vercel não abre janelas no Windows diretamente. O
+`runner/worker.py` precisa estar rodando na sessão gráfica do Windows.
+O Cloudflare Tunnel apenas encaminha os comandos autenticados. O PC
+precisa estar ligado, e perfis abertos manualmente com as versões
+anteriores precisam ser encerrados antes de iniciar o novo executor.
+Se não aparecer a janela, verifique o firewall/antivírus, a barra de
+tarefas e `runner/private/worker.log`. No Windows, não execute o
+executor como Serviço do Windows ou tarefa sem usuário conectado,
+pois nesse caso não existe desktop interativo para exibir a janela.
+
+**Segurança:** o endereço Cloudflare é temporário e a chave dá acesso às
+sessões. Troque qualquer chave já compartilhada publicamente antes de
+entrar com contas reais; mantenha os dados de perfis fora do GitHub.
+
+---
+
 # Nexora Chromium Executor (Railway)
 
 **This service is required for real multi-login on the Vercel dashboard.** It runs actual Chromium contexts in an always-on container, isolating profile folders under /data/profiles.
