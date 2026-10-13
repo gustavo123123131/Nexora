@@ -65,5 +65,34 @@ class ChromiumRunnerTests(unittest.TestCase):
             fixture.server_close()
 
 
+
+
+class TunnelCorsTests(unittest.TestCase):
+    """Browser requests must be CORS-scoped and require the executor key."""
+    def test_via_vercel_origin_only_and_bearer(self):
+        from unittest.mock import patch
+        with patch.dict(os.environ, {'NEXORA_RUNNER_KEY': 'A' * 48}):
+            client = runner_module.app.test_client()
+            origin = 'https://nexora-ebon-eight.vercel.app'
+            preflight = client.options('/v1/health', headers={
+                'Origin': origin,
+                'Access-Control-Request-Method': 'GET',
+                'Access-Control-Request-Headers': 'authorization'})
+            self.assertEqual(preflight.status_code, 204)
+            self.assertEqual(preflight.headers['Access-Control-Allow-Origin'], origin)
+            self.assertIn('Authorization', preflight.headers['Access-Control-Allow-Headers'])
+            missing = client.get('/v1/health', headers={'Origin': origin})
+            self.assertEqual(missing.status_code, 401)
+            correct = client.get('/v1/health', headers={
+                'Origin': origin, 'Authorization': 'Bearer ' + 'A' * 48})
+            self.assertEqual(correct.status_code, 200)
+            self.assertTrue(correct.json['browser'])
+            blocked = client.get('/v1/health', headers={
+                'Origin': 'https://evil.example',
+                'Authorization': 'Bearer ' + 'A' * 48})
+            self.assertEqual(blocked.status_code, 403)
+            blocked_preflight = client.options('/v1/health', headers={'Origin': 'https://evil.example'})
+            self.assertEqual(blocked_preflight.status_code, 403)
+
 if __name__ == '__main__':
     unittest.main()
