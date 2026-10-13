@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>Nexora — Gerenciamento de perfis</title>
   <link rel="stylesheet" href="/style.css">
+  <script defer src="/local_store.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -58,7 +59,7 @@
           </div>
           <div class="section-title"><div><h2>Lista de perfis</h2><span>Perfis independentes cadastrados</span></div><span class="helper" id="profileHelper"><i></i> Configurações independentes</span></div>
           <div id="profileList" class="profiles-list"></div>
-          <div class="info-line"><span class="info-icon">ⓘ</span> O modo mobile simula um navegador Android no Chromium. Não executa o sistema Android real.</div>
+          <div class="info-line"><span class="info-icon">ⓘ</span> A hospedagem Vercel não executa navegadores Android ou Chromium persistentes. Para testar isolamento real de contas, precisaremos conectar um executor externo.</div>
         </section>
 
         <section id="siteContent" hidden>
