@@ -324,6 +324,18 @@ class BrowserWorker:
         page = self.page(pid)
         return {'url': page.url, 'input_count': page.locator('input').count()}
 
+    def _profile_state_for_test(self, pw, pid, set_value=None):
+        """Offline integration test only; never exposed by an HTTP route."""
+        page = self.page(pid)
+        if set_value is not None:
+            page.evaluate("(value) => localStorage.setItem('nexora-test', value)", set_value)
+        return {
+            'ua': page.evaluate('navigator.userAgent'),
+            'viewport': page.viewport_size,
+            'local_storage': page.evaluate("localStorage.getItem('nexora-test')"),
+            'device': self._stored_device(pid),
+        }
+
     def stop(self, pw, pid):
         context = self.contexts.get(pid)
         if context is None:
