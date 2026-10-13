@@ -100,3 +100,18 @@ test('headed Windows profile opens on desktop without screenshot viewer', async 
   assert.ok(!scene.records.some(record => record.target.includes('/v1/frame/')),
     'starting a Windows profile should not request embedded screenshot frames');
 });
+
+
+test('forwards selected device model for each independent profile', async () => {
+  const url = 'https://example-random.trycloudflare.com';
+  const scene = createSandbox([url, 'c'.repeat(48)], {desktop: true});
+  await scene.remote.connect();
+  await scene.remote.start('a'.repeat(32), 'https://example.com/a', 'Pixel 5');
+  await scene.remote.start('b'.repeat(32), 'https://example.com/b', 'Galaxy S9+');
+  const starts = scene.records.filter(record => record.target.endsWith('/v1/start'));
+  assert.equal(starts.length, 2);
+  assert.equal(JSON.parse(starts[0].options.body).device, 'Pixel 5');
+  assert.equal(JSON.parse(starts[1].options.body).device, 'Galaxy S9+');
+  assert.notEqual(JSON.parse(starts[0].options.body).id, JSON.parse(starts[1].options.body).id);
+  assert.ok(!scene.records.some(record => record.target.includes('/v1/frame/')));
+});
