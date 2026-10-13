@@ -7,6 +7,7 @@
   const running = new Set();
   let secret = sessionStorage.getItem(STORAGE_KEY) || '';
   let activeId = null;
+  let configured = false;
   let objectUrl = null;
   let pollTimer = null;
   let busy = false;
@@ -49,7 +50,8 @@
   async function initialize() {
     try {
       const config = await api('config');
-      if (!config.configured) {
+      configured = Boolean(config.configured);
+      if (!configured) {
         document.querySelector('#runnerButton').title = 'Configure NEXORA_RUNNER_URL na Vercel e instale o executor em um servidor com armazenamento persistente.';
       }
       if (secret) await authenticate();
@@ -67,6 +69,13 @@
   }
 
   async function connect() {
+    try {
+      configured = Boolean((await api('config')).configured);
+    } catch (_) { configured = false; }
+    if (!configured) {
+      alert('Ainda falta implantar o executor Chromium e configurar NEXORA_RUNNER_URL na Vercel. Sem isso, o botão Abrir não pode iniciar uma sessão isolada.');
+      return;
+    }
     const value = prompt('Digite a chave privada NEXORA_RUNNER_KEY do seu executor Chromium (não é senha do painel):',
       secret || '');
     if (value === null) return;
@@ -199,6 +208,9 @@
       const y = (event.clientY - bounds.top) * img.naturalHeight / bounds.height;
       await action('click', {x: Math.round(x), y: Math.round(y)});
     }
+  });
+  document.querySelector('#remoteShowText')?.addEventListener('change', event => {
+    document.querySelector('#remoteText').type = event.target.checked ? 'text' : 'password';
   });
   document.querySelector('#remoteText')?.addEventListener('keydown', event => {
     if (event.key === 'Enter') {
