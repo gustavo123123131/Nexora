@@ -53,3 +53,6 @@
   .remote-screen img { max-height: 65vh; }
   .top-actions #runnerButton { font-size: 11px; padding: 7px; }
 }
+
+.remote-show { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #d0d8e6; white-space: nowrap; }
+.remote-show input { width: auto; min-width: 0; flex: none; }
