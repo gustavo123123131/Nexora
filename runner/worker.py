@@ -34,6 +34,10 @@ def valid_url(value):
     if not isinstance(value, str) or not 8 <= len(value) <= 2048 or any(ord(c) < 33 for c in value):
         raise ValueError('URL inválida.')
     p = urlsplit(value)
+    try:
+        _port = p.port
+    except ValueError:
+        raise ValueError('Porta inválida.')
     if p.scheme not in ('http', 'https') or not p.hostname or p.username or p.password:
         raise ValueError('A URL deve ser HTTP(S), sem credenciais.')
     host = p.hostname.lower().rstrip('.')
@@ -144,7 +148,7 @@ class BrowserWorker:
 
     def frame(self, pw, pid):
         return self.page(pid).screenshot(type='jpeg', quality=68, timeout=8000,
-                                         animations='disabled')
+                                         animations='disabled', scale='css')
 
     def act(self, pw, pid, data):
         page = self.page(pid)
@@ -153,7 +157,7 @@ class BrowserWorker:
             x, y = data.get('x'), data.get('y')
             if not isinstance(x, (int, float)) or not isinstance(y, (int, float)) or not 0 <= x <= 500 or not 0 <= y <= 1200:
                 raise ValueError('Coordenadas inválidas.')
-            page.mouse.click(x, y, timeout=8000)
+            page.mouse.click(x, y)
         elif kind == 'type':
             content = data.get('text')
             if not isinstance(content, str) or len(content) > 2048:
