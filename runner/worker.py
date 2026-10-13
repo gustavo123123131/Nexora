@@ -139,6 +139,11 @@ class BrowserWorker:
                 self.contexts.pop(pid, None)
             raise
 
+    def _cookie_names_for_test(self, pw, pid):
+        """Internal smoke-test helper; never exposed as an HTTP route."""
+        context = self.contexts[pid]
+        return [item['name'] for item in context.cookies()]
+
     def stop(self, pw, pid):
         context = self.contexts.pop(pid, None)
         if context is None:
