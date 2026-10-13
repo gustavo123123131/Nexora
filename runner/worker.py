@@ -81,8 +81,9 @@ def host_browser_locale():
         language = language.replace('_', '-')
         if re.fullmatch(r'[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', language):
             return language
-    # The runtime is not reporting a supported locale; avoid inventing one.
-    return None
+    # If the OS reports only C/POSIX, Chromium defaults to en-US in its JS
+    # environment; explicitly use that same browser default for HTTP headers.
+    return 'en-US'
 
 
 def chromium_launch_options(pw):
