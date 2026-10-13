@@ -29,6 +29,20 @@ MAX_PROFILES = max(1, min(6, int(os.environ.get('NEXORA_MAX_PROFILES', '3'))))
 # The Linux xvfb test can explicitly opt into headed mode.
 DESKTOP_MODE = os.name == 'nt' or os.environ.get('NEXORA_DESKTOP_MODE') == '1'
 AUTOSAVE_SECONDS = 3
+# Supported Chromium-compatible Android presets from Playwright 1.57.
+# Server-side allowlist prevents arbitrary browser arguments or user-agent
+# strings from being supplied via the public control-panel API.
+DEVICE_MODELS = ('Pixel 7', 'Pixel 5', 'Galaxy S9+', 'Galaxy S5', 'Nexus 5')
+DEFAULT_DEVICE = 'Pixel 7'
+
+
+def validate_device(device):
+    if device is None:
+        return DEFAULT_DEVICE
+    if not isinstance(device, str) or device not in DEVICE_MODELS:
+        raise ValueError('Modelo de dispositivo não suportado.')
+    return device
+
 
 
 
@@ -86,9 +100,12 @@ def host_browser_locale():
     return 'en-US'
 
 
-def chromium_launch_options(pw):
-    """Preserve the actual Pixel 7 Playwright device profile in both modes."""
-    device = pw.devices['Pixel 7']
+def chromium_launch_options(pw, device_name=DEFAULT_DEVICE):
+    """Use an approved, real Playwright Android device descriptor per profile."""
+    name = validate_device(device_name)
+    device = pw.devices[name]
+    if device.get('default_browser_type') != 'chromium':
+        raise ValueError('Este modelo não é suportado pelo Chromium.')
     options = {key: value for key, value in device.items()
                if key != 'default_browser_type'}
     # Use the actual OS language so navigator.language and Accept-Language
@@ -194,6 +211,27 @@ class BrowserWorker:
     def _cookie_path(self, pid):
         return STORE / pid / '.nexora-session-cookies.json'
 
+    def _device_path(self, pid):
+        return STORE / pid / '.nexora-device.json'
+
+    def _stored_device(self, pid):
+        path = self._device_path(pid)
+        if not path.is_file():
+            return DEFAULT_DEVICE
+        data = json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(data, dict):
+            raise ValueError('Configuração do dispositivo inválida.')
+        return validate_device(data.get('device'))
+
+    def _save_device(self, pid, device_name):
+        """Save per-profile configuration without overwriting cookies/login."""
+        path = self._device_path(pid)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temp = path.with_name('.nexora-device.tmp')
+        temp.write_text(json.dumps({'device': device_name}, ensure_ascii=False),
+                        encoding='utf-8')
+        os.replace(temp, path)
+
     def _save_cookies(self, context, pid):
         """Persist session cookies as well as persistent cookies, atomically.
         A context's session cookies can otherwise disappear on browser restart.
@@ -237,15 +275,20 @@ class BrowserWorker:
         self.cookie_backups[pid] = json.dumps(cookies, ensure_ascii=False,
                                              sort_keys=True).encode('utf-8')
 
-    def start(self, pw, pid, url):
+    def start(self, pw, pid, url, device_name=None):
+        device_name = self._stored_device(pid) if device_name is None else validate_device(device_name)
         if self.status(pw, pid)['running']:
-            return {'running': True, 'already_open': True, 'desktop': DESKTOP_MODE}
+            running_device = self._stored_device(pid)
+            if device_name != running_device:
+                raise ValueError('Encerre o perfil antes de trocar o dispositivo.')
+            return {'running': True, 'already_open': True,
+                    'desktop': DESKTOP_MODE, 'device': running_device}
         if len(self.contexts) >= MAX_PROFILES:
             raise ValueError(f'Limite de {MAX_PROFILES} navegadores simultâneos.')
         STORE.mkdir(parents=True, exist_ok=True)
         profile_dir = STORE / pid
         profile_dir.mkdir(exist_ok=True)
-        opts = chromium_launch_options(pw)
+        opts = chromium_launch_options(pw, device_name)
         context = pw.chromium.launch_persistent_context(str(profile_dir), **opts)
         self.contexts[pid] = context
         try:
@@ -253,12 +296,16 @@ class BrowserWorker:
             page = context.pages[0] if context.pages else context.new_page()
             page.set_default_timeout(8000)
             page.goto(url, wait_until='domcontentloaded', timeout=12000)
+            self._save_device(pid, device_name)
             if DESKTOP_MODE:
                 page.bring_to_front()
-            return {'running': True, 'already_open': False, 'desktop': DESKTOP_MODE}
+            return {'running': True, 'already_open': False,
+                    'desktop': DESKTOP_MODE, 'device': device_name}
         except PlaywrightError:
             # A failed navigation must not discard the browser / persistent data.
+            self._save_device(pid, device_name)
             return {'running': True, 'already_open': False, 'desktop': DESKTOP_MODE,
+                    'device': device_name,
                     'warning': 'Janela iniciada, mas o site não terminou de carregar.'}
         except Exception:
             try:
@@ -379,7 +426,8 @@ def public_health():
 @app.get('/v1/health')
 def health():
     return jsonify(ok=True, browser=True, mode='remote', desktop=DESKTOP_MODE,
-                   device='Pixel 7', max_profiles=MAX_PROFILES)
+                   devices=DEVICE_MODELS, default_device=DEFAULT_DEVICE,
+                   max_profiles=MAX_PROFILES)
 
 
 @app.get('/v1/status/<pid>')
@@ -394,7 +442,10 @@ def status(pid):
 def start():
     try:
         data = request.get_json()
-        return jsonify(worker.run('start', valid_id(data.get('id')), valid_url(data.get('url'))))
+        if not isinstance(data, dict):
+            raise ValueError('Requisição inválida.')
+        return jsonify(worker.run('start', valid_id(data.get('id')),
+                                  valid_url(data.get('url')), data.get('device')))
     except ValueError as exc:
         return jsonify(error=str(exc)), 400
     except Exception:
