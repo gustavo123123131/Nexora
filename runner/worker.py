@@ -64,14 +64,20 @@ def chromium_launch_options(pw):
     device = pw.devices['Pixel 7']
     options = {key: value for key, value in device.items()
                if key != 'default_browser_type'}
+    # Do not force pt-BR or America/Sao_Paulo: Playwright uses the actual
+    # host locale/timezone when unset. Emulation is not a real Android OS.
+    # The outer OS window needs room for the device viewport AND browser UI.
+    viewport = device['viewport']
+    outer_width = viewport['width'] + 150
+    outer_height = viewport['height'] + 155
+    window_size = f'--window-size={outer_width},{outer_height}'
+    args = [] if os.name == 'nt' else ['--no-sandbox', '--disable-dev-shm-usage']
+    if DESKTOP_MODE:
+        args.append(window_size)
     options.update(
         headless=not DESKTOP_MODE,
-        locale='pt-BR',
-        timezone_id='America/Sao_Paulo',
         accept_downloads=DESKTOP_MODE,
-        args=(['--window-size=520,900'] if os.name == 'nt' else
-              ['--no-sandbox', '--disable-dev-shm-usage'] +
-              (['--window-size=520,900'] if DESKTOP_MODE else [])),
+        args=args,
     )
     return options
 
