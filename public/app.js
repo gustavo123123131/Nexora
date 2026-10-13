@@ -71,9 +71,15 @@ function renderProfiles() {
   }
   container.innerHTML = state.profiles.map(profile => {
     const site = state.sites.find(s => s.id === profile.site_id);
-    const running = profile.status === 'running';
-    const unavailable = profile.status === 'unavailable' || !browserAvailable;
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${unavailable ? 'unavailable' : (running ? 'running' : '')}">${unavailable ? '◌ Executor não conectado' : (running ? '● Em execução':'○ Parado')}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${unavailable ? (browserLocalMode ? `<button class="btn btn-secondary" data-action="visit" data-id="${profile.id}" title="Abre site em uma aba comum, sem isolamento de contas">↗ Abrir site (sem isolamento)</button>` : '<button class="btn btn-secondary" disabled title="É necessário um executor de navegadores remoto">Navegador indisponível</button>') : `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'stop':'start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Iniciar'}</button>`}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir perfil e seus dados" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    const remoteReady = browserLocalMode && !!globalThis.NexoraRemote?.connected;
+    const running = remoteReady ? globalThis.NexoraRemote.isRunning(profile.id) : profile.status === 'running';
+    const unavailable = browserLocalMode ? !remoteReady : (profile.status === 'unavailable' || !browserAvailable);
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${unavailable ? 'unavailable' : (running ? 'running' : '')}">${unavailable ? '◌ Executor não conectado' : (running ? '● Em execução':'○ Parado')}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${unavailable ? (browserLocalMode
+      ? '<button class="btn btn-secondary" data-action="remote-connect" title="Conecte seu Chromium remoto para iniciar este perfil">Conectar navegador</button>'
+      : '<button class="btn btn-secondary" disabled>Navegador indisponível</button>')
+      : (remoteReady
+        ? `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'remote-stop':'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Abrir'}</button>${running ? `<button class="btn btn-ghost" data-action="remote-view" data-id="${profile.id}">Ver navegador</button>` : ''}`
+        : `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'stop':'start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Iniciar'}</button>`))}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir perfil e seus dados" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
 }
 function renderSites() {
@@ -173,13 +179,19 @@ $('#modalForm').addEventListener('submit', async event => {
 function updateEnvironment() {
   $('#cloudNotice').hidden = browserAvailable;
   $('#logoutButton').hidden = browserLocalMode || !cloudMode;
+  $('#runnerButton').hidden = !browserLocalMode;
+  if (browserLocalMode) {
+    $('#runnerButton').textContent = globalThis.NexoraRemote?.connected ? '◉ Navegador conectado' : 'Conectar navegador';
+  }
   $('#importButton').hidden = !cloudMode;
   $('#runtimeStatus').textContent = browserLocalMode ? 'Cadastros neste navegador' : (cloudMode ? 'Painel hospedado na Vercel' : 'Executando localmente');
   $('#connectionLabel').textContent = browserLocalMode ? 'Modo sem senha' : (cloudMode ? 'Nuvem conectada' : 'Conexão local');
   $('#versionLabel').textContent = browserLocalMode ? 'Nexora · Vercel / dados locais' : (cloudMode ? 'Nexora · Vercel' : 'Nexora · modo local');
-  $('#profileHelper').textContent = browserAvailable ? 'Dados isolados por perfil' : 'Cadastros independentes; sessões não isoladas';
+  $('#profileHelper').textContent = browserAvailable ? 'Dados isolados por perfil' : 'Executor não conectado';
   $('#cloudNotice p').textContent = browserLocalMode
-    ? 'Modo sem senha: sites e perfis são salvos SOMENTE neste navegador, não na Vercel. Abrir um site usa uma aba comum e NÃO isola cookies ou login. O multi-login real ainda precisa de um executor remoto persistente.'
+    ? (globalThis.NexoraRemote?.connected
+      ? 'Executor Chromium conectado: cada perfil tem uma sessão real separada. Os logins são guardados no volume persistente do executor, não na Vercel. O modo mobile é emulado.'
+      : 'Perfis cadastrados neste navegador. Para fazer multi-login de verdade, conecte o executor Chromium remoto. A Vercel sozinha não mantém sessões independentes.')
     : 'Perfis e sites ficam no banco remoto, mas o navegador persistente exige um executor dedicado. A Vercel sozinha não abre sessões independentes.';
   $('.device-tile strong').textContent = browserAvailable ? 'Android Mobile' : 'Executor remoto';
   $('.device-tile span:last-child').textContent = browserAvailable ? 'Pixel 7 · Chromium' : 'Não conectado';
@@ -227,6 +239,7 @@ async function initialize() {
     browserAvailable = false;
     showApp();
     await refresh();
+    await globalThis.NexoraRemote?.initialize();
     return;
   }
   try {
@@ -243,3 +256,10 @@ async function initialize() {
 }
 initialize();
 setInterval(() => {if (!busy && !document.hidden && !$('#mainShell').hidden) refresh();}, 10000);
+
+// Called by remote_browser.js after a successful authenticated health check.
+globalThis.NexoraUIRemoteConnection = function (connected) {
+  browserAvailable = Boolean(connected);
+  updateEnvironment();
+  render();
+};
