@@ -16,12 +16,26 @@
   let busy = false;
 
   function validateTunnelUrl(text) {
+    // Accept a full pasted console line or terminal output, extracting only
+    // its one Cloudflare URL. Never forward arbitrary domains or pasted text.
+    const raw = String(text ?? '').trim();
+    const urls = [...new Set((raw.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com(?=$|[\s\/?#"'<>])/gi) || [])
+      .map(url => url.toLowerCase()))];
+    let candidate;
+    if (urls.length === 1) {
+      candidate = urls[0];
+    } else if (!urls.length && /^[a-z0-9-]+\.trycloudflare\.com\/?$/i.test(raw)) {
+      candidate = 'https://' + raw;
+    } else {
+      throw new Error('Cole a URL https://...trycloudflare.com exibida na janela preta. Copiar somente o endereço é suficiente.');
+    }
     let parsed;
-    try { parsed = new URL(text); } catch (_) { throw new Error('Endereço do Cloudflare inválido.'); }
+    try { parsed = new URL(candidate); }
+    catch (_) { throw new Error('Endereço do Cloudflare inválido.'); }
     if (parsed.protocol !== 'https:' || !/^[a-z0-9-]+\.trycloudflare\.com$/i.test(parsed.hostname)
       || parsed.username || parsed.password || parsed.port || parsed.pathname !== '/'
       || parsed.search || parsed.hash) {
-      throw new Error('Cole somente a URL https://...trycloudflare.com gerada no Windows, sem caminhos ou parâmetros.');
+      throw new Error('O endereço precisa terminar em .trycloudflare.com.');
     }
     return parsed.origin;
   }
