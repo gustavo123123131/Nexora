@@ -4,6 +4,7 @@ All browser state is isolated under NEXORA_PROFILE_DIR/<profile-id>.
 Remote control uses a high-entropy secret; do not publish it to client code.
 """
 import hmac
+import json
 import ipaddress
 import os
 import queue
@@ -57,6 +58,7 @@ class BrowserWorker:
     def __init__(self):
         self.jobs = queue.Queue()
         self.contexts = {}
+        self.cookie_backups = {}
         self.thread = threading.Thread(target=self._serve, daemon=True, name='playwright-worker')
         self.thread.start()
 
@@ -109,6 +111,52 @@ class BrowserWorker:
             self.contexts.pop(pid, None)
             return {'running': False}
 
+    def _cookie_path(self, pid):
+        return STORE / pid / '.nexora-session-cookies.json'
+
+    def _save_cookies(self, context, pid):
+        """Persist session cookies as well as persistent cookies, atomically.
+        A context's session cookies can otherwise disappear on browser restart.
+        """
+        encoded = json.dumps(context.cookies(), ensure_ascii=False, sort_keys=True).encode('utf-8')
+        if self.cookie_backups.get(pid) == encoded:
+            return
+        target = self._cookie_path(pid)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temp = target.with_name('.nexora-session-cookies.tmp')
+        fd = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(encoded)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp, target)
+            os.chmod(target, 0o600)
+            self.cookie_backups[pid] = encoded
+        finally:
+            if temp.exists():
+                temp.unlink()
+
+    def _restore_cookies(self, context, pid):
+        path = self._cookie_path(pid)
+        if not path.exists():
+            return
+        cookies = json.loads(path.read_text('utf-8'))
+        if not isinstance(cookies, list):
+            raise ValueError('Backup de cookies inválido.')
+        prepared = []
+        for item in cookies:
+            if not isinstance(item, dict):
+                raise ValueError('Cookie inválido no backup.')
+            cookie = dict(item)
+            if cookie.get('expires', 0) <= 0:
+                cookie.pop('expires', None)  # Restore as session cookie.
+            prepared.append(cookie)
+        if prepared:
+            context.add_cookies(prepared)
+        self.cookie_backups[pid] = json.dumps(cookies, ensure_ascii=False,
+                                             sort_keys=True).encode('utf-8')
+
     def start(self, pw, pid, url):
         if self.status(pw, pid)['running']:
             return {'running': True, 'already_open': True}
@@ -124,6 +172,7 @@ class BrowserWorker:
         context = pw.chromium.launch_persistent_context(str(profile_dir), **opts)
         self.contexts[pid] = context
         try:
+            self._restore_cookies(context, pid)
             page = context.pages[0] if context.pages else context.new_page()
             page.set_default_timeout(8000)
             page.goto(url, wait_until='domcontentloaded', timeout=12000)
@@ -145,15 +194,22 @@ class BrowserWorker:
         return [item['name'] for item in context.cookies()]
 
     def stop(self, pw, pid):
-        context = self.contexts.pop(pid, None)
+        context = self.contexts.get(pid)
         if context is None:
             return {'running': False}
+        # If cookie backup fails, leave the browser running rather than
+        # silently discarding the session.
+        self._save_cookies(context, pid)
         context.close()
+        self.contexts.pop(pid, None)
+        self.cookie_backups.pop(pid, None)
         return {'running': False}
 
     def frame(self, pw, pid):
-        return self.page(pid).screenshot(type='jpeg', quality=68, timeout=8000,
-                                         animations='disabled', scale='css')
+        screenshot = self.page(pid).screenshot(type='jpeg', quality=68, timeout=8000,
+                                              animations='disabled', scale='css')
+        self._save_cookies(self.contexts[pid], pid)
+        return screenshot
 
     def act(self, pw, pid, data):
         page = self.page(pid)
