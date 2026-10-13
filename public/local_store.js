@@ -5,6 +5,14 @@
   'use strict';
   const KEY = 'nexora.site-profiles.v1';
   const HEX_ID = /^[a-f0-9]{32}$/;
+  const DEVICES = Object.freeze(['Pixel 7', 'Pixel 5', 'Galaxy S9+', 'Galaxy S5', 'Nexus 5']);
+  const DEFAULT_DEVICE = 'Pixel 7';
+  function device(value) {
+    const chosen = value === undefined || value === null ? DEFAULT_DEVICE : value;
+    if (typeof chosen !== 'string' || !DEVICES.includes(chosen))
+      throw new Error('Selecione um modelo de dispositivo válido.');
+    return chosen;
+  }
 
   function read() {
     const raw = localStorage.getItem(KEY);
@@ -49,7 +57,7 @@
   function state(data) {
     return {
       sites: data.sites,
-      profiles: data.profiles.map(p => ({ ...p, status: 'unavailable' })),
+      profiles: data.profiles.map(p => ({ ...p, device: device(p.device), status: 'unavailable' })),
       capabilities: {
         mode: 'vercel', browser: false, storage: 'browser',
         reason: 'Cadastros guardados somente neste navegador. Nenhum executor remoto foi conectado.'
@@ -79,8 +87,19 @@
     }
     if (route === 'profiles/create') {
       if (!data.sites.some(s => s.id === body.site_id)) throw new Error('Selecione um site cadastrado.');
-      const profile = { id: id(), name: name(body.name), site_id: body.site_id };
+      const profile = { id: id(), name: name(body.name), site_id: body.site_id, device: device(body.device) };
       data.profiles.push(profile); save(data); return { ...profile, status: 'unavailable' };
+    }
+    if (route === 'profiles/update') {
+      const profileId = requireId(body.id);
+      const current = data.profiles.find(p => p.id === profileId);
+      if (!current) throw new Error('Perfil não encontrado.');
+      if (!data.sites.some(s => s.id === body.site_id)) throw new Error('Site não encontrado.');
+      const updated = { ...current, name: name(body.name),
+                        site_id: body.site_id, device: device(body.device) };
+      data.profiles = data.profiles.map(p => p.id === profileId ? updated : p);
+      save(data);
+      return { ...updated, status: 'unavailable' };
     }
     if (route === 'profiles/delete') {
       const profileId = requireId(body.id);
@@ -100,7 +119,7 @@
       }
       for (const p of body.profiles) {
         if (!p || typeof p !== 'object') throw new Error('Perfil inválido.');
-        const value = { id: requireId(p.id), name: name(p.name), site_id: requireId(p.site_id) };
+        const value = { id: requireId(p.id), name: name(p.name), site_id: requireId(p.site_id), device: device(p.device) };
         if (!next.sites.some(s => s.id === value.site_id)) throw new Error('Perfil referencia um site inexistente.');
         if (!next.profiles.some(existing => existing.id === value.id)) { next.profiles.push(value); profiles++; }
       }
@@ -112,5 +131,5 @@
     }
     throw new Error('Operação não disponível.');
   }
-  globalThis.NexoraBrowserStore = Object.freeze({ request });
+  globalThis.NexoraBrowserStore = Object.freeze({ request, devices: DEVICES, defaultDevice: DEFAULT_DEVICE });
 })();
