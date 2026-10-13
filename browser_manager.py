@@ -47,9 +47,9 @@ class BrowserManager:
         options.update(
             headless=self.headless,
             accept_downloads=True,
-            locale='pt-BR',
-            timezone_id='America/Sao_Paulo',
-            args=['--window-size=480,980'],
+            # Follow the machine's locale and timezone instead of imposing
+            # a different geographic environment on every local profile.
+            args=[f"--window-size={device['viewport']['width'] + 150},{device['viewport']['height'] + 155}"],
         )
         if self.executable_path:
             options['executable_path'] = self.executable_path
