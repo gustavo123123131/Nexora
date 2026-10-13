@@ -1,29 +1,31 @@
-"""Reproducible browser-environment audit without contacting Fingerprint or the internet.
+"""Offline, reproducible Playwright diagnostics: no user IP, accounts or score.
 
-It compares the former explicit pt-BR/Sao_Paulo options with the current
-host-derived defaults on the *same* Playwright build. It cannot reproduce the
-user's Fingerprint.com risk score or inspect their Windows environment.
+Old = the same device preset with the formerly hardcoded pt-BR/Sao_Paulo.
+New = identical preset without those overrides (OS-derived defaults).
+Both contexts visit a local loopback fixture so JS, viewport meta and HTTP
+User-Agent / Client Hints can be compared objectively.
 """
 import json
 import platform
-import re
 import tempfile
+import threading
 import unittest
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 from runner.worker import chromium_launch_options
 
 
-EVAL = """async () => {
+JS = """async () => {
   const hints = navigator.userAgentData;
   return {
     userAgent: navigator.userAgent,
     platform: navigator.platform,
     uaClientHintsPlatform: hints ? hints.platform : null,
     uaClientHintsMobile: hints ? hints.mobile : null,
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
+    viewportWidth: innerWidth,
+    viewportHeight: innerHeight,
     screenWidth: screen.width,
     screenHeight: screen.height,
     pixelRatio: devicePixelRatio,
@@ -32,63 +34,99 @@ EVAL = """async () => {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     webdriver: navigator.webdriver,
     webglRenderer: (() => {
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('webgl');
-      return context ? context.getParameter(context.RENDERER) : null;
+      const gl = document.createElement('canvas').getContext('webgl');
+      return gl ? gl.getParameter(gl.RENDERER) : null;
     })()
   };
 }"""
 
 
-def collect(pw, options):
-    with tempfile.TemporaryDirectory(prefix='nexora-browser-audit-') as directory:
+class PageFixture(BaseHTTPRequestHandler):
+    header_samples = []
+
+    def do_GET(self):
+        if self.path == '/':
+            PageFixture.header_samples.append({
+                key: self.headers.get(key) for key in
+                ('User-Agent', 'Accept-Language',
+                 'Sec-CH-UA-Platform', 'Sec-CH-UA-Mobile')
+            })
+        body = (b'<!doctype html><html><head><meta name="viewport" '
+                b'content="width=device-width, initial-scale=1"></head>'
+                b'<body><p>Nexora test fixture</p></body></html>')
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/html')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+def collect(playwright, options, url):
+    with tempfile.TemporaryDirectory(prefix='nexora-audit-') as directory:
         options = dict(options, headless=True)
         options['args'] = [item for item in options['args']
                            if not item.startswith('--window-size=')]
-        context = pw.chromium.launch_persistent_context(str(Path(directory)), **options)
+        context = playwright.chromium.launch_persistent_context(
+            str(Path(directory)), **options)
         try:
             page = context.pages[0] if context.pages else context.new_page()
-            return page.evaluate(EVAL)
+            page.goto(url, wait_until='domcontentloaded')
+            properties = page.evaluate(JS)
+            self_report = dict(properties)
+            return self_report
         finally:
             context.close()
 
 
 class BrowserEnvironmentAudit(unittest.TestCase):
     def test_before_after_browser_properties(self):
-        with sync_playwright() as pw:
-            current = chromium_launch_options(pw)
-            before = dict(current, locale='pt-BR',
-                          timezone_id='America/Sao_Paulo')
-            old = collect(pw, before)
-            after = collect(pw, current)
-            comparison = {
-                'platformOfRunner': platform.system(),
-                'oldHardcodedOptions': {'locale': 'pt-BR', 'timezone_id': 'America/Sao_Paulo'},
-                'newOptions': {'locale': 'host default', 'timezone_id': 'host default'},
-                'before': old,
-                'after': after,
-            }
-            # This output intentionally excludes IPs, passwords, cookies,
-            # browsing history and private-account information.
-            print('NEXORA_BROWSER_BEFORE_AFTER=' +
-                  json.dumps(comparison, sort_keys=True, ensure_ascii=False), flush=True)
+        PageFixture.header_samples.clear()
+        fixture = ThreadingHTTPServer(('127.0.0.1', 0), PageFixture)
+        threading.Thread(target=fixture.serve_forever, daemon=True).start()
+        url = 'http://127.0.0.1:%d/' % fixture.server_port
+        try:
+            with sync_playwright() as playwright:
+                after_options = chromium_launch_options(playwright)
+                before_options = dict(after_options, locale='pt-BR',
+                                      timezone_id='America/Sao_Paulo')
+                before = collect(playwright, before_options, url)
+                after = collect(playwright, after_options, url)
+                self.assertEqual(len(PageFixture.header_samples), 2)
+                comparison = {
+                    'testPlatform': platform.system(),
+                    'oldOptions': {'locale': 'pt-BR', 'timezone_id': 'America/Sao_Paulo'},
+                    'newOptions': {'locale': 'host default', 'timezone_id': 'host default'},
+                    'before': {**before, 'httpHeaders': PageFixture.header_samples[0]},
+                    'after': {**after, 'httpHeaders': PageFixture.header_samples[1]},
+                }
+                print('NEXORA_BROWSER_BEFORE_AFTER=' +
+                      json.dumps(comparison, sort_keys=True, ensure_ascii=False),
+                      flush=True)
 
-            for key in ('userAgent', 'platform', 'uaClientHintsPlatform',
-                        'uaClientHintsMobile', 'viewportWidth', 'viewportHeight',
-                        'screenWidth', 'screenHeight', 'pixelRatio',
-                        'touchPoints', 'webdriver', 'webglRenderer'):
-                self.assertEqual(old[key], after[key],
-                                 'Localization changes must not affect ' + key)
-            self.assertIn('Android', after['userAgent'])
-            self.assertGreater(after['touchPoints'], 0)
-            self.assertTrue(after['viewportWidth'] > 0)
-            self.assertEqual(old['language'], 'pt-BR')
-            self.assertEqual(old['timeZone'], 'America/Sao_Paulo')
-            self.assertNotIn('locale', current)
-            self.assertNotIn('timezone_id', current)
-            # Playwright remains automation. Explicitly assert no stealth
-            # workarounds were introduced in the production configuration.
-            self.assertIs(after['webdriver'], True)
+                for name in ('userAgent', 'platform', 'uaClientHintsPlatform',
+                             'uaClientHintsMobile', 'viewportWidth', 'viewportHeight',
+                             'screenWidth', 'screenHeight', 'pixelRatio',
+                             'touchPoints', 'webdriver', 'webglRenderer'):
+                    self.assertEqual(before[name], after[name], name)
+                preset = playwright.devices['Pixel 7']
+                self.assertEqual(after['viewportWidth'], preset['viewport']['width'])
+                self.assertEqual(after['viewportHeight'], preset['viewport']['height'])
+                self.assertEqual(after['pixelRatio'], preset['device_scale_factor'])
+                self.assertIn('Android', after['userAgent'])
+                self.assertGreater(after['touchPoints'], 0)
+                self.assertEqual(before['language'], 'pt-BR')
+                self.assertEqual(before['timeZone'], 'America/Sao_Paulo')
+                self.assertNotIn('locale', after_options)
+                self.assertNotIn('timezone_id', after_options)
+                self.assertIs(after['webdriver'], True)
+                self.assertEqual(before['httpHeaders']['User-Agent'],
+                                 after['httpHeaders']['User-Agent'])
+        finally:
+            fixture.shutdown()
+            fixture.server_close()
 
 
 if __name__ == '__main__':
