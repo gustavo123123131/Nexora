@@ -1,0 +1,11 @@
+data/
+.venv/
+.git/
+tests/
+__pycache__/
+*.pyc
+*.bat
+*.zip
+browser_manager.py
+server.py
+requirements-local.txt

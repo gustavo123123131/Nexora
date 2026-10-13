@@ -1,11 +1,11 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title MultiLogin Mobile - Servidor Local
+title Nexora - Servidor Local (legado)
 
 echo.
 echo ================================================
-echo       MULTILOGIN MOBILE - INSTALACAO
+echo       NEXORA - MODO LOCAL (LEGADO)
  echo ================================================
 if exist ".venv\Scripts\python.exe" goto ready
 where py >nul 2>&1
@@ -19,7 +19,7 @@ if not errorlevel 1 (
 if errorlevel 1 goto failed
 
 :ready
-".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements.txt
+".venv\Scripts\python.exe" -m pip install --disable-pip-version-check -r requirements-local.txt
 if errorlevel 1 goto failed
 ".venv\Scripts\python.exe" -m playwright install chromium
 if errorlevel 1 goto failed

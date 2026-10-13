@@ -1,0 +1,10 @@
+# NEVER commit local sessions, credentials or Chromium profiles
+/data/
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.vercel/
+*.log
