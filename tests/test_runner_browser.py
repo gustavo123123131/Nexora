@@ -73,6 +73,70 @@ class ChromiumRunnerTests(unittest.TestCase):
 
 
 
+class MultiDeviceChromiumTests(unittest.TestCase):
+    """Real browser test: different devices, directories, cookies and storage."""
+
+    def test_models_independent_windows_and_persistent_storage(self):
+        from runner.worker import validate_device, DEVICE_MODELS
+        self.assertGreaterEqual(len(DEVICE_MODELS), 4)
+        self.assertEqual(validate_device(None), 'Pixel 7')
+        with self.assertRaises(ValueError):
+            validate_device('--disable-web-security')
+
+        fixture = ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
+        threading.Thread(target=fixture.serve_forever, daemon=True).start()
+        base = 'http://127.0.0.1:%d' % fixture.server_port
+        first, second = 'c' * 32, 'd' * 32
+        try:
+            with tempfile.TemporaryDirectory() as home:
+                with patch.object(runner_module, 'STORE', Path(home)):
+                    manager = runner_module.BrowserWorker()
+                    try:
+                        first_start = manager.run('start', first, base + '/first', 'Pixel 5')
+                        second_start = manager.run('start', second, base + '/second', 'Galaxy S9+')
+                        self.assertEqual(first_start['device'], 'Pixel 5')
+                        self.assertEqual(second_start['device'], 'Galaxy S9+')
+                        state_a = manager.run('_profile_state_for_test', first, 'account-A')
+                        state_b = manager.run('_profile_state_for_test', second, 'account-B')
+                        self.assertIn('Android', state_a['ua'])
+                        self.assertIn('Android', state_b['ua'])
+                        self.assertNotEqual(state_a['viewport'], state_b['viewport'])
+                        self.assertEqual(state_a['local_storage'], 'account-A')
+                        self.assertEqual(state_b['local_storage'], 'account-B')
+                        self.assertEqual(state_a['device'], 'Pixel 5')
+                        self.assertEqual(state_b['device'], 'Galaxy S9+')
+                        self.assertIn('first_profile', manager.run('_cookie_names_for_test', first))
+                        self.assertNotIn('first_profile', manager.run('_cookie_names_for_test', second))
+                        self.assertTrue((Path(home) / first / '.nexora-device.json').exists())
+                        self.assertTrue((Path(home) / second / '.nexora-device.json').exists())
+                        with self.assertRaisesRegex(ValueError, 'Encerre'):
+                            manager.run('start', first, base + '/first', 'Nexus 5')
+
+                        # Stop one independent window; the other keeps running.
+                        self.assertFalse(manager.run('stop', first)['running'])
+                        self.assertTrue(manager.run('status', second)['running'])
+                        self.assertTrue(manager.run('start', first, base + '/plain')['running'])
+                        reopened = manager.run('_profile_state_for_test', first)
+                        self.assertEqual(reopened['device'], 'Pixel 5')
+                        self.assertEqual(reopened['local_storage'], 'account-A')
+                        self.assertIn('first_profile', manager.run('_cookie_names_for_test', first))
+                        self.assertEqual(manager.run('_profile_state_for_test', second)['local_storage'],
+                                         'account-B')
+                        # After close, a deliberate model change is allowed,
+                        # and login/session files remain in the same directory.
+                        self.assertFalse(manager.run('stop', first)['running'])
+                        self.assertTrue(manager.run('start', first, base + '/plain', 'Nexus 5')['running'])
+                        changed = manager.run('_profile_state_for_test', first)
+                        self.assertEqual(changed['device'], 'Nexus 5')
+                        self.assertEqual(changed['local_storage'], 'account-A')
+                    finally:
+                        manager.run('stop', first)
+                        manager.run('stop', second)
+        finally:
+            fixture.shutdown()
+            fixture.server_close()
+
+
 class DesktopChromiumConfigurationTests(unittest.TestCase):
     """The Windows executor must never start a hidden Chromium process."""
 
