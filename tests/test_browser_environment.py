@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
-from runner.worker import chromium_launch_options, host_browser_locale
+from runner.worker import chromium_launch_options, host_browser_locale, DEVICE_MODELS
 
 
 JS = """async () => {
@@ -82,6 +82,18 @@ def collect(playwright, options, url):
 
 
 class BrowserEnvironmentAudit(unittest.TestCase):
+    def test_every_offered_device_preset_is_real_and_chromium_compatible(self):
+        with sync_playwright() as playwright:
+            for name in DEVICE_MODELS:
+                with self.subTest(device=name):
+                    self.assertIn(name, playwright.devices)
+                    options = chromium_launch_options(playwright, name)
+                    self.assertTrue(options.get('is_mobile'))
+                    self.assertTrue(options.get('has_touch'))
+                    self.assertIn('Android', options['user_agent'])
+                    self.assertGreater(options['viewport']['width'], 0)
+                    self.assertGreater(options['viewport']['height'], 0)
+
     def test_before_after_browser_properties(self):
         PageFixture.header_samples.clear()
         fixture = ThreadingHTTPServer(('127.0.0.1', 0), PageFixture)
