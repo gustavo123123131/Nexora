@@ -74,3 +74,58 @@ test('import is transactional and does not store cookies', () => {
   assert.throws(() => store.request('import', {sites:[],profiles:[{id:'c'.repeat(32),name:'Bad',site_id:'d'.repeat(32)}]}), /inexistente/);
   assert.equal(store.request('state').profiles.length, 1);
 });
+
+
+test('device model is independently chosen, edited and retained across reloads', () => {
+  memory.clear();
+  const store = browserStore();
+  assert.ok(store.devices.includes('Pixel 7'));
+  assert.ok(store.devices.includes('Pixel 5'));
+  assert.ok(store.devices.includes('Galaxy S9+'));
+  const site = store.request('sites/create', {name: 'Independent', url: 'https://example.org'});
+  const first = store.request('profiles/create', {
+    name: 'Account 1', site_id: site.id, device: 'Pixel 5'
+  });
+  const second = store.request('profiles/create', {
+    name: 'Account 2', site_id: site.id, device: 'Galaxy S9+'
+  });
+  const storeReload = browserStore();
+  const values = storeReload.request('state').profiles;
+  assert.equal(values.find(p => p.id === first.id).device, 'Pixel 5');
+  assert.equal(values.find(p => p.id === second.id).device, 'Galaxy S9+');
+
+  storeReload.request('profiles/update', {
+    id: first.id, name: 'Account 1 edited', site_id: site.id, device: 'Nexus 5'
+  });
+  const after = browserStore().request('state').profiles;
+  assert.equal(after.find(p => p.id === first.id).device, 'Nexus 5');
+  assert.equal(after.find(p => p.id === second.id).device, 'Galaxy S9+');
+  assert.throws(() => store.request('profiles/create', {
+    name: 'Invalid', site_id: site.id, device: '--no-sandbox'
+  }), /dispositivo válido/);
+  assert.throws(() => store.request('profiles/update', {
+    id: second.id, name: 'Invalid', site_id: site.id, device: 'iPhone 15'
+  }), /dispositivo válido/);
+  assert.equal(browserStore().request('state').profiles.find(p => p.id === second.id).device,
+               'Galaxy S9+');
+});
+
+test('legacy profiles and imports default to Pixel 7 without losing IDs or records', () => {
+  memory.clear();
+  const store = browserStore();
+  const site = store.request('sites/create', {name: 'Old', url: 'https://example.org'});
+  const profile = store.request('profiles/create', {name: 'Old profile', site_id:site.id});
+  assert.equal(profile.device, 'Pixel 7');
+  const old = JSON.parse(memory.get('nexora.site-profiles.v1'));
+  delete old.profiles[0].device;
+  memory.set('nexora.site-profiles.v1', JSON.stringify(old));
+  const result = browserStore().request('state').profiles[0];
+  assert.equal(result.id, profile.id);
+  assert.equal(result.device, 'Pixel 7');
+  const imported = store.request('import', {
+    sites:[], profiles:[{id:'e'.repeat(32),name:'Imported',site_id:site.id}]
+  });
+  assert.equal(imported.perfis_importados,1);
+  assert.equal(browserStore().request('state').profiles.find(p => p.id === 'e'.repeat(32)).device,
+               'Pixel 7');
+});
