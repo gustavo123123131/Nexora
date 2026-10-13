@@ -34,3 +34,5 @@ jobs:
         run: cd runner && gunicorn --check-config worker:app
       - name: Real browser profile isolation and persistence
         run: python -m unittest discover -s tests -p test_runner_browser.py -v
+      - name: Headed Chromium windows in a virtual desktop (Xvfb)
+        run: NEXORA_DESKTOP_MODE=1 xvfb-run -a python -m unittest discover -s tests -p test_runner_browser.py -v
