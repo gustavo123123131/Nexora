@@ -1,0 +1,153 @@
+'use strict';
+const $ = selector => document.querySelector(selector);
+const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let state = {sites:[], profiles:[]};
+let page = 'profiles';
+let busy = false;
+let toastTimer = null;
+
+async function api(route, body) {
+  const response = await fetch('/api/' + route, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: body === undefined ? {} : {'Content-Type':'application/json'},
+    body: body === undefined ? undefined : JSON.stringify(body),
+    cache: 'no-store'
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Não foi possível concluir a operação.');
+  return data;
+}
+function toast(message, isError=false) {
+  const el = $('#toast');
+  el.textContent = message;
+  el.className = 'toast visible' + (isError ? ' is-error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.className = 'toast', 4500);
+}
+async function refresh() {
+  try {
+    state = await api('state');
+    render();
+  } catch (err) {
+    toast('Servidor não responde: ' + err.message, true);
+  }
+}
+function render() {
+  $('#navProfileCount').textContent = state.profiles.length;
+  const active = state.profiles.filter(p => p.status === 'running').length;
+  $('#statProfiles').textContent = state.profiles.length;
+  $('#statActive').textContent = active;
+  $('#statSites').textContent = state.sites.length;
+  $('.nav-link[data-page="profiles"]').classList.toggle('is-active', page === 'profiles');
+  $('.nav-link[data-page="sites"]').classList.toggle('is-active', page === 'sites');
+  $('#profileContent').hidden = page !== 'profiles';
+  $('#siteContent').hidden = page !== 'sites';
+  $('#pageTitle').textContent = page === 'profiles' ? 'Seus perfis' : 'Sites cadastrados';
+  $('#breadcrumbCurrent').textContent = page === 'profiles' ? 'Perfis' : 'Sites';
+  $('#pageDescription').textContent = page === 'profiles'
+    ? 'Gerencie navegadores independentes com experiência mobile Android.'
+    : 'Configure os endereços que serão abertos nos perfis.';
+  $('#primaryAction').innerHTML = '<span class="plus">+</span> ' + (page === 'profiles' ? 'Criar perfil' : 'Adicionar site');
+  renderProfiles();
+  renderSites();
+}
+function renderProfiles() {
+  const container = $('#profileList');
+  if (!state.profiles.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-art">▣</div><h3>Nenhum perfil por enquanto</h3><p>${state.sites.length ? 'Crie seu primeiro perfil para abrir um navegador mobile independente.' : 'Primeiro cadastre um site. Depois, crie perfis para manter contas separadas.'}</p><button class="btn btn-primary" data-action="${state.sites.length ? 'add-profile' : 'add-site'}">${state.sites.length ? 'Criar primeiro perfil' : 'Cadastrar primeiro site'} →</button></div>`;
+    return;
+  }
+  container.innerHTML = state.profiles.map(profile => {
+    const site = state.sites.find(s => s.id === profile.site_id);
+    const running = profile.status === 'running';
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${running ? 'running':''}">${running ? '● Em execução':'○ Parado'}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions"><button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'stop':'start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Iniciar'}</button><button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir perfil e seus dados" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+  }).join('');
+}
+function renderSites() {
+  const container = $('#siteList');
+  if (!state.sites.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-art">◎</div><h3>Você ainda não cadastrou sites</h3><p>Adicione um endereço para selecioná-lo ao criar um perfil.</p><button class="btn btn-primary" data-action="add-site">+ Cadastrar site</button></div>';
+    return;
+  }
+  container.innerHTML = state.sites.map(site => `<article class="site-card"><div class="site-icon">◎</div><div class="site-info"><div class="card-heading"><h3>${escapeHTML(site.name)}</h3></div><div class="card-info">${escapeHTML(site.url)}</div></div><div class="card-actions"><button class="btn btn-ghost" data-action="edit-site" data-id="${site.id}">Editar</button><button class="icon-button" data-action="delete-site" data-id="${site.id}" title="Excluir site" aria-label="Excluir ${escapeHTML(site.name)}">×</button></div></article>`).join('');
+}
+function openModal(kind, item) {
+  const isSite = kind === 'site';
+  $('#modal').hidden = false;
+  $('#modalTitle').textContent = isSite ? (item ? 'Editar site' : 'Adicionar site') : 'Novo perfil';
+  $('#modalDescription').textContent = isSite ? 'Defina o nome e o endereço para abrir no navegador.' : 'Cada perfil terá seu próprio navegador e sessão isolada.';
+  $('#modalSubmit').textContent = item ? 'Salvar alterações' : (isSite ? 'Adicionar site' : 'Criar perfil');
+  $('#modalFields').innerHTML = isSite
+    ? `<div class="field"><label for="fieldName">Nome do site</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Site principal" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldUrl">Endereço (URL)</label><input id="fieldUrl" name="url" type="url" maxlength="2048" placeholder="https://exemplo.com" required value="${escapeHTML(item?.url || '')}"><div class="field-note">Use http:// ou https:// no endereço.</div></div>`
+    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}">${escapeHTML(site.name)}</option>`).join('')}</select><div class="field-note">Chromium em modo Android Pixel 7 · sessão persistente.</div></div>`;
+  $('#modalForm').dataset.kind = kind;
+  $('#modalForm').dataset.id = item?.id || '';
+  $('#fieldName').focus();
+}
+function closeModal(){ $('#modal').hidden = true; $('#modalForm').reset(); }
+async function perform(route, payload, successText) {
+  if (busy) return;
+  busy = true;
+  document.querySelectorAll('button[data-action], #modalSubmit').forEach(b => b.disabled = true);
+  try {
+    const result = await api(route, payload);
+    await refresh();
+    if (successText) toast(successText);
+    if (result.warning) toast(result.warning, true);
+    return true;
+  } catch (err) {
+    toast(err.message, true);
+    return false;
+  } finally {
+    busy = false;
+    document.querySelectorAll('button[data-action], #modalSubmit').forEach(b => b.disabled = false);
+  }
+}
+document.addEventListener('click', async event => {
+  const nav = event.target.closest('[data-page]');
+  if (nav) {page=nav.dataset.page;render();return;}
+  const btn = event.target.closest('[data-action]');
+  if (!btn || busy) return;
+  const action = btn.dataset.action;
+  const id = btn.dataset.id;
+  if (action === 'add-site') return openModal('site');
+  if (action === 'add-profile') {
+    if (!state.sites.length) { page='sites';render();toast('Cadastre um site antes de criar um perfil.');return openModal('site'); }
+    return openModal('profile');
+  }
+  if (action === 'edit-site') return openModal('site', state.sites.find(s => s.id === id));
+  if (action === 'start') return perform('profiles/start', {id}, 'Navegador iniciado. Faça login manualmente na janela aberta.');
+  if (action === 'stop') return perform('profiles/stop', {id}, 'Perfil encerrado. Sessão salva.');
+  if (action === 'delete-profile') {
+    const profile = state.profiles.find(p => p.id === id);
+    if (confirm(`Excluir o perfil "${profile?.name || ''}"? Cookies e dados salvos serão apagados definitivamente.`)) return perform('profiles/delete', {id}, 'Perfil excluído.');
+  }
+  if (action === 'delete-site') {
+    const site = state.sites.find(s => s.id === id);
+    if (confirm(`Excluir o site "${site?.name || ''}"?`)) return perform('sites/delete', {id}, 'Site excluído.');
+  }
+});
+$('#primaryAction').addEventListener('click', () => {
+  if (page === 'sites') openModal('site');
+  else if (!state.sites.length) {page='sites';render();toast('Cadastre um site antes de criar um perfil.');openModal('site');}
+  else openModal('profile');
+});
+$('#modalClose').addEventListener('click', closeModal);
+$('#modalCancel').addEventListener('click', closeModal);
+$('#modal').addEventListener('click', event => {if (event.target.id === 'modal') closeModal();});
+document.addEventListener('keydown', event => {if (event.key === 'Escape' && !$('#modal').hidden) closeModal();});
+$('#modalForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  if (busy) return;
+  const form = event.currentTarget;
+  const kind = form.dataset.kind;
+  const id = form.dataset.id;
+  const name = $('#fieldName').value;
+  const payload = kind === 'site' ? {name, url:$('#fieldUrl').value} : {name, site_id:$('#fieldSite').value};
+  const route = kind === 'site' ? (id ? 'sites/update':'sites/create') : 'profiles/create';
+  if (id) payload.id = id;
+  const ok = await perform(route, payload, 'Salvo com sucesso.');
+  if (ok) closeModal();
+});
+refresh();
+setInterval(() => {if (!busy && !document.hidden) refresh();}, 4000);

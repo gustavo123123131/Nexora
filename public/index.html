@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>MultiLogin Mobile — Painel Local</title>
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="MultiLogin Mobile">
+        <span class="brand-icon">◈</span>
+        <span><strong>MultiLogin</strong><small>MOBILE MANAGER</small></span>
+      </a>
+      <div class="nav-caption">GERENCIAMENTO</div>
+      <nav class="nav" aria-label="Navegação principal">
+        <button type="button" class="nav-link is-active" data-page="profiles"><span class="nav-symbol">▦</span><span>Perfis</span><span id="navProfileCount" class="nav-count">0</span></button>
+        <button type="button" class="nav-link" data-page="sites"><span class="nav-symbol">◎</span><span>Sites cadastrados</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="device-tile"><span class="device-icon">♧</span><div><strong>Android Mobile</strong><span>Pixel 7 · Chromium</span></div></div>
+        <div class="local-status"><span class="pulse"></span>Executando localmente</div>
+        <span class="version">MVP 1.0 · localhost:3000</span>
+      </div>
+    </aside>
+
+    <main class="content">
+      <header class="topbar">
+        <div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumbCurrent">Perfis</strong></div>
+        <div class="top-actions"><span class="connection"><i></i> Conexão local</span><span class="avatar">ML</span></div>
+      </header>
+      <div class="page">
+        <section class="page-heading">
+          <div><div class="eyebrow">GERENCIAMENTO DE SESSÕES</div><h1 id="pageTitle">Seus perfis</h1><p id="pageDescription">Gerencie navegadores independentes com experiência mobile Android.</p></div>
+          <button id="primaryAction" class="btn btn-primary"><span class="plus">+</span> Criar perfil</button>
+        </section>
+
+        <section id="profileContent">
+          <div class="stats">
+            <article class="stat"><span class="stat-label">Total de perfis</span><div><strong id="statProfiles">0</strong><span class="stat-icon purple">▣</span></div><small>Perfis configurados</small></article>
+            <article class="stat"><span class="stat-label">Sessões ativas</span><div><strong id="statActive">0</strong><span class="stat-icon green">◉</span></div><small>Navegadores em execução</small></article>
+            <article class="stat"><span class="stat-label">Sites vinculados</span><div><strong id="statSites">0</strong><span class="stat-icon blue">◎</span></div><small>Endereços disponíveis</small></article>
+          </div>
+          <div class="section-title"><div><h2>Lista de perfis</h2><span>Abra cada conta em uma janela separada</span></div><span class="helper"><i></i> Dados isolados por perfil</span></div>
+          <div id="profileList" class="profiles-list"></div>
+          <div class="info-line"><span class="info-icon">ⓘ</span> O modo mobile simula um navegador Android no Chromium. Não executa o sistema Android real.</div>
+        </section>
+
+        <section id="siteContent" hidden>
+          <div class="section-title site-title"><div><h2>Biblioteca de sites</h2><span>Cadastre e edite os endereços usados pelos perfis</span></div></div>
+          <div id="siteList" class="sites-list"></div>
+          <div class="info-line"><span class="info-icon">ⓘ</span> Ao editar um site, o novo endereço será usado na próxima abertura dos perfis vinculados.</div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="modal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button id="modalClose" class="icon-button modal-close" type="button" aria-label="Fechar">×</button>
+      <div class="modal-emblem">◈</div>
+      <h2 id="modalTitle">Novo perfil</h2><p id="modalDescription">Preencha os dados para começar.</p>
+      <form id="modalForm"><div id="modalFields"></div><div class="form-actions"><button type="button" class="btn btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn btn-primary" id="modalSubmit">Salvar</button></div></form>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
