@@ -74,14 +74,16 @@ function renderProfiles() {
   container.innerHTML = state.profiles.map(profile => {
     const site = state.sites.find(s => s.id === profile.site_id);
     const remoteReady = browserLocalMode && !!globalThis.NexoraRemote?.connected;
+    const desktopReady = remoteReady && !!globalThis.NexoraRemote.desktop;
     const running = remoteReady ? globalThis.NexoraRemote.isRunning(profile.id) : profile.status === 'running';
     const unavailable = browserLocalMode ? !remoteReady : (profile.status === 'unavailable' || !browserAvailable);
     let actions = '';
     if (browserLocalMode && !remoteReady) {
       actions = '<button class="btn btn-secondary" data-action="remote-connect">Conectar navegador</button>';
     } else if (remoteReady) {
-      actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'remote-stop' : 'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar' : '▶ Abrir'}</button>`;
-      if (running) actions += `<button class="btn btn-ghost" data-action="remote-view" data-id="${profile.id}">Ver navegador</button>`;
+      actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'remote-stop' : 'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar' : (desktopReady ? '▶ Iniciar perfil' : '▶ Abrir')}</button>`;
+      // Windows profiles are native Chromium windows, not iframe/screenshot previews.
+      if (running && !desktopReady) actions += `<button class="btn btn-ghost" data-action="remote-view" data-id="${profile.id}">Ver navegador</button>`;
     } else if (unavailable) {
       actions = '<button class="btn btn-secondary" disabled>Navegador indisponível</button>';
     } else {
@@ -210,7 +212,9 @@ function updateEnvironment() {
   $('#profileHelper').textContent = browserAvailable ? 'Dados isolados por perfil' : 'Executor não conectado';
   $('#cloudNotice p').textContent = browserLocalMode
     ? (globalThis.NexoraRemote?.connected
-      ? 'Executor Chromium conectado: cada perfil tem uma sessão real separada. Os logins são guardados no volume persistente do executor, não na Vercel. O modo mobile é emulado.'
+      ? (globalThis.NexoraRemote.desktop
+        ? 'Executor Windows conectado. Iniciar perfil abre uma janela real e independente do Chromium na área de trabalho; os dados e logins ficam separados no seu PC. A emulação mobile usa Pixel 7.'
+        : 'Executor Chromium conectado: cada perfil tem uma sessão real separada. Os logins são guardados no volume persistente do executor, não na Vercel. O modo mobile é emulado.')
       : 'Perfis cadastrados neste navegador. Para fazer multi-login de verdade, conecte o executor Chromium remoto. A Vercel sozinha não mantém sessões independentes.')
     : 'Perfis e sites ficam no banco remoto, mas o navegador persistente exige um executor dedicado. A Vercel sozinha não abre sessões independentes.';
   $('.device-tile strong').textContent = browserAvailable ? 'Android Mobile' : 'Executor remoto';
@@ -286,3 +290,6 @@ globalThis.NexoraUIRemoteConnection = function (connected) {
 
 // Remote Chromium controller reads ONLY metadata; session credentials stay in runner.
 globalThis.NexoraGetProfiles = () => state.profiles.slice();
+
+// Native Chromium launcher notifies without taking focus back from desktop windows.
+globalThis.NexoraUIRemoteNotice = message => toast(message);
