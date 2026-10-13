@@ -6,4 +6,4 @@ COPY worker.py .
 ENV PYTHONUNBUFFERED=1
 ENV NEXORA_PROFILE_DIR=/data/profiles
 EXPOSE 8080
-CMD ["python", "worker.py"]
+CMD ["sh", "-c", "exec gunicorn --workers 1 --threads 8 --timeout 60 --bind 0.0.0.0:${PORT:-8080} worker:app"]
