@@ -62,6 +62,7 @@
 
   const remote = {
     connected: false,
+    desktop: false,
     isRunning: id => running.has(id),
     initialize,
     connect,
@@ -93,6 +94,7 @@
   async function authenticate() {
     const info = await api('health');
     if (!info.browser || !info.ok) throw new Error('Executor não suporta Chromium remoto.');
+    remote.desktop = info.desktop === true;
     remote.connected = true;
     await fetchStatuses();
     refreshPanel();
@@ -129,7 +131,9 @@
       await authenticate();
       sessionStorage.setItem(TUNNEL_KEY, tunnelUrl);
       sessionStorage.setItem(STORAGE_KEY, secret);
-      alert('Conexão verificada! Clique em Abrir no perfil para iniciar o Chromium independente.');
+      alert(remote.desktop
+        ? 'Conexão verificada! Clique em Iniciar perfil: uma janela REAL do Chromium vai abrir na área de trabalho do Windows.'
+        : 'Conexão verificada! Clique em Abrir no perfil para iniciar o Chromium independente.');
     } catch (error) {
       tunnelUrl = oldUrl;
       secret = oldKey;
@@ -158,7 +162,13 @@
       if (!response.running) throw new Error('O executor não confirmou a abertura.');
       running.add(id);
       refreshPanel();
-      view(id);
+      if (remote.desktop || response.desktop) {
+        // Do not open the embedded screenshot viewer on Windows.
+        // The local Playwright worker already launched a real OS window.
+        globalThis.NexoraUIRemoteNotice?.('Chromium aberto na área de trabalho do Windows.');
+      } else {
+        view(id);
+      }
       if (response.warning) alert(response.warning);
     } catch (error) {alert('Não foi possível abrir o perfil: ' + error.message);}
   }
@@ -188,6 +198,7 @@
 
   function view(id) {
     if (!running.has(id)) return alert('Abra o perfil antes de visualizar.');
+    if (remote.desktop) return alert('Esta sessão já está em uma janela independente do Chromium no Windows. Use a barra de tarefas ou Alt+Tab para encontrá-la.');
     hideViewer();
     activeId = id;
     document.querySelector('#remoteViewer').hidden = false;
