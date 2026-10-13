@@ -67,6 +67,32 @@ class ChromiumRunnerTests(unittest.TestCase):
 
 
 
+class DesktopChromiumConfigurationTests(unittest.TestCase):
+    """The Windows executor must never start a hidden Chromium process."""
+
+    def test_native_windows_mode_preserves_pixel7_emulation(self):
+        from types import SimpleNamespace
+        fake = SimpleNamespace(devices={'Pixel 7': {
+            'user_agent': 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36',
+            'viewport': {'width': 412, 'height': 915},
+            'device_scale_factor': 2.625,
+            'is_mobile': True,
+            'has_touch': True,
+            'default_browser_type': 'chromium'
+        }})
+        with patch.object(runner_module, 'DESKTOP_MODE', True):
+            config = runner_module.chromium_launch_options(fake)
+            self.assertIs(config['headless'], False)
+            self.assertTrue(config['is_mobile'])
+            self.assertTrue(config['has_touch'])
+            self.assertEqual(config['viewport'], {'width': 412, 'height': 915})
+            self.assertIn('Pixel 7', config['user_agent'])
+            self.assertTrue(config['accept_downloads'])
+        with patch.object(runner_module, 'DESKTOP_MODE', False):
+            config = runner_module.chromium_launch_options(fake)
+            self.assertIs(config['headless'], True)
+
+
 class TunnelCorsTests(unittest.TestCase):
     """Browser requests must be CORS-scoped and require the executor key."""
     def test_via_vercel_origin_only_and_bearer(self):
