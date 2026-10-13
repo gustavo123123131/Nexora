@@ -155,10 +155,10 @@
     refreshPanel();
   }
 
-  async function start(id, url) {
+  async function start(id, url, device = 'Pixel 7') {
     if (!remote.connected) return connect();
     try {
-      const response = await api('start', {id, url});
+      const response = await api('start', {id, url, device});
       if (!response.running) throw new Error('O executor não confirmou a abertura.');
       running.add(id);
       refreshPanel();
