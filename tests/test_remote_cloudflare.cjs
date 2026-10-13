@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const remoteCode = fs.readFileSync(path.join(__dirname, '..', 'public', 'remote_browser.js'), 'utf8');
 
-function createSandbox(prompts) {
+function createSandbox(prompts, {desktop = false} = {}) {
   const records = [];
   const alerts = [];
   const store = new Map();
@@ -32,7 +32,7 @@ function createSandbox(prompts) {
       return {
         ok:true,
         status:200,
-        json: async () => ({ok:true,browser:true}),
+        json: async () => target.endsWith('/v1/start') ? {running: true, desktop} : {ok:true,browser:true,desktop},
         blob: async () => new Blob([])
       };
     },
@@ -84,4 +84,19 @@ test('accepts a trycloudflare hostname without https scheme', async () => {
   await scene.remote.connect();
   assert.equal(scene.remote.connected, true);
   assert.equal(scene.records[0].target, url + '/v1/health');
+});
+
+
+test('headed Windows profile opens on desktop without screenshot viewer', async () => {
+  const url = 'https://example-random.trycloudflare.com';
+  const key = 'k'.repeat(48);
+  const scene = createSandbox([url, key], {desktop: true});
+  await scene.remote.connect();
+  assert.equal(scene.remote.desktop, true);
+  const id = 'a'.repeat(32);
+  await scene.remote.start(id, 'https://www.example.com/');
+  assert.equal(scene.remote.isRunning(id), true);
+  assert.ok(scene.records.some(record => record.target === url + '/v1/start'));
+  assert.ok(!scene.records.some(record => record.target.includes('/v1/frame/')),
+    'starting a Windows profile should not request embedded screenshot frames');
 });
