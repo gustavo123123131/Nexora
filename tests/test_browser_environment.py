@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
-from runner.worker import chromium_launch_options
+from runner.worker import chromium_launch_options, host_browser_locale
 
 
 JS = """async () => {
@@ -98,7 +98,7 @@ class BrowserEnvironmentAudit(unittest.TestCase):
                 comparison = {
                     'testPlatform': platform.system(),
                     'oldOptions': {'locale': 'pt-BR', 'timezone_id': 'America/Sao_Paulo'},
-                    'newOptions': {'locale': 'host default', 'timezone_id': 'host default'},
+                    'newOptions': {'locale': 'detected from OS', 'timezone_id': 'host default'},
                     'before': {**before, 'httpHeaders': PageFixture.header_samples[0]},
                     'after': {**after, 'httpHeaders': PageFixture.header_samples[1]},
                 }
@@ -119,11 +119,14 @@ class BrowserEnvironmentAudit(unittest.TestCase):
                 self.assertGreater(after['touchPoints'], 0)
                 self.assertEqual(before['language'], 'pt-BR')
                 self.assertEqual(before['timeZone'], 'America/Sao_Paulo')
-                self.assertNotIn('locale', after_options)
+                self.assertEqual(after_options.get('locale'), host_browser_locale())
                 self.assertNotIn('timezone_id', after_options)
                 self.assertIs(after['webdriver'], True)
-                self.assertEqual(before['httpHeaders']['User-Agent'],
-                                 after['httpHeaders']['User-Agent'])
+                self.assertEqual(PageFixture.header_samples[0]['User-Agent'],
+                                 PageFixture.header_samples[1]['User-Agent'])
+                self.assertEqual(after['language'], after_options['locale'])
+                self.assertEqual(PageFixture.header_samples[1]['Accept-Language'],
+                                 after_options['locale'])
         finally:
             fixture.shutdown()
             fixture.server_close()
