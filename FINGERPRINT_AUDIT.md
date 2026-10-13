@@ -87,3 +87,27 @@ ser mantida privada (e rotacionada se divulgada anteriormente).
 - https://playwright.dev/python/docs/api/class-browsertype
 - https://fingerprint.com/products/smart-signals/
 - https://fingerprint.com/blog/anti-detect-browser-detection/
+
+
+## Auditoria adicional em Windows GitHub Actions
+Pipeline: .github/workflows/nexora-smoke.yml, job windows-browser-audit,
+executado com Playwright 1.57 / Chromium 143. O teste passou.
+
+- UA antes/depois: Linux; Android 14; Pixel 7; Chrome/143.
+- Client Hints antes/depois: plataforma Android, mobile true.
+- navigator.platform antes/depois: **Win32**. É uma diferença real em
+  relação ao UA Android; não foi mascarada.
+- navigator.webdriver antes/depois: true.
+- Viewport 412 x 839, DPR 2.625, touchPoints=1, sem alteração.
+- locale/Accept-Language antes: pt-BR / pt-BR.
+- locale/Accept-Language depois: en-US / en-US (idioma do Windows de CI).
+- timezone antes: America/Sao_Paulo; depois: UTC (Windows de CI).
+
+Esses números pertencem ao runner **Windows do GitHub**, não ao PC do usuário.
+Num Windows em português do Brasil e com fuso de São Paulo, por exemplo,
+ambos os valores podem permanecer pt-BR/Sao_Paulo após a correção; a
+alteração elimina imposições quando o sistema realmente difere.
+
+O Chromium via Playwright continua expondo sinais de automação e não é
+equivalente a um aparelho Android real. Não foi observado nem prometido
+qualquer novo Suspect Score no Fingerprint.com.
