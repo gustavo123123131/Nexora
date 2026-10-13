@@ -7,9 +7,14 @@ let busy = false;
 let toastTimer = null;
 let cloudMode = false;
 let browserAvailable = true;
+// Vercel defaults to passwordless browser-local metadata. Add ?storage=cloud to
+// deliberately opt into the legacy authenticated PostgreSQL deployment.
+const browserLocalMode = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+  && new URLSearchParams(location.search).get('storage') !== 'cloud';
 
 
 async function api(route, body) {
+  if (browserLocalMode) return globalThis.NexoraBrowserStore.request(route, body);
   const response = await fetch('/api/' + route, {
     method: body === undefined ? 'GET' : 'POST',
     headers: body === undefined ? {} : {'Content-Type':'application/json'},
@@ -68,7 +73,7 @@ function renderProfiles() {
     const site = state.sites.find(s => s.id === profile.site_id);
     const running = profile.status === 'running';
     const unavailable = profile.status === 'unavailable' || !browserAvailable;
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${unavailable ? 'unavailable' : (running ? 'running' : '')}">${unavailable ? '◌ Executor não conectado' : (running ? '● Em execução':'○ Parado')}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${unavailable ? '<button class="btn btn-secondary" disabled title="É necessário um executor de navegadores remoto">Navegador indisponível</button>' : `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'stop':'start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Iniciar'}</button>`}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir perfil e seus dados" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${unavailable ? 'unavailable' : (running ? 'running' : '')}">${unavailable ? '◌ Executor não conectado' : (running ? '● Em execução':'○ Parado')}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${unavailable ? (browserLocalMode ? `<button class="btn btn-secondary" data-action="visit" data-id="${profile.id}" title="Abre site em uma aba comum, sem isolamento de contas">↗ Abrir site (sem isolamento)</button>` : '<button class="btn btn-secondary" disabled title="É necessário um executor de navegadores remoto">Navegador indisponível</button>') : `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'stop':'start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Iniciar'}</button>`}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir perfil e seus dados" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
 }
 function renderSites() {
@@ -124,11 +129,19 @@ document.addEventListener('click', async event => {
     return openModal('profile');
   }
   if (action === 'edit-site') return openModal('site', state.sites.find(s => s.id === id));
+  if (action === 'visit') {
+    const profile = state.profiles.find(p => p.id === id);
+    const site = state.sites.find(s => s.id === profile?.site_id);
+    if (!site) return toast('Site não encontrado.', true);
+    if (!confirm('Abrir "' + site.name + '" numa aba comum? A aba NÃO terá cookies isolados de outras contas. Não é um teste válido de multi-login.')) return;
+    window.open(site.url, '_blank', 'noopener,noreferrer');
+    return;
+  }
   if (action === 'start') return perform('profiles/start', {id}, 'Navegador iniciado. Faça login manualmente na janela aberta.');
   if (action === 'stop') return perform('profiles/stop', {id}, 'Perfil encerrado. Sessão salva.');
   if (action === 'delete-profile') {
     const profile = state.profiles.find(p => p.id === id);
-    if (confirm(`Excluir o perfil "${profile?.name || ''}"? ${browserAvailable ? 'Cookies e dados locais serão apagados definitivamente.' : 'O registro será removido do banco de dados.'}`)) return perform('profiles/delete', {id}, 'Perfil excluído.');
+    if (confirm(`Excluir o perfil "${profile?.name || ''}"? ${browserAvailable ? 'Cookies e dados locais serão apagados definitivamente.' : (browserLocalMode ? 'O cadastro salvo neste navegador será removido.' : 'O registro será removido do banco de dados.')}`)) return perform('profiles/delete', {id}, 'Perfil excluído.');
   }
   if (action === 'delete-site') {
     const site = state.sites.find(s => s.id === id);
@@ -159,12 +172,15 @@ $('#modalForm').addEventListener('submit', async event => {
 });
 function updateEnvironment() {
   $('#cloudNotice').hidden = browserAvailable;
-  $('#logoutButton').hidden = !cloudMode;
+  $('#logoutButton').hidden = browserLocalMode || !cloudMode;
   $('#importButton').hidden = !cloudMode;
-  $('#runtimeStatus').textContent = cloudMode ? 'Painel hospedado na Vercel' : 'Executando localmente';
-  $('#connectionLabel').textContent = cloudMode ? 'Nuvem conectada' : 'Conexão local';
-  $('#versionLabel').textContent = cloudMode ? 'Nexora · Vercel' : 'Nexora · modo local';
-  $('#profileHelper').textContent = browserAvailable ? 'Dados isolados por perfil' : 'Somente cadastro disponível';
+  $('#runtimeStatus').textContent = browserLocalMode ? 'Cadastros neste navegador' : (cloudMode ? 'Painel hospedado na Vercel' : 'Executando localmente');
+  $('#connectionLabel').textContent = browserLocalMode ? 'Modo sem senha' : (cloudMode ? 'Nuvem conectada' : 'Conexão local');
+  $('#versionLabel').textContent = browserLocalMode ? 'Nexora · Vercel / dados locais' : (cloudMode ? 'Nexora · Vercel' : 'Nexora · modo local');
+  $('#profileHelper').textContent = browserAvailable ? 'Dados isolados por perfil' : 'Cadastros independentes; sessões não isoladas';
+  $('#cloudNotice p').textContent = browserLocalMode
+    ? 'Modo sem senha: sites e perfis são salvos SOMENTE neste navegador, não na Vercel. Abrir um site usa uma aba comum e NÃO isola cookies ou login. O multi-login real ainda precisa de um executor remoto persistente.'
+    : 'Perfis e sites ficam no banco remoto, mas o navegador persistente exige um executor dedicado. A Vercel sozinha não abre sessões independentes.';
   $('.device-tile strong').textContent = browserAvailable ? 'Android Mobile' : 'Executor remoto';
   $('.device-tile span:last-child').textContent = browserAvailable ? 'Pixel 7 · Chromium' : 'Não conectado';
 }
@@ -206,6 +222,13 @@ $('#importFile').addEventListener('change', async event => {
   finally {event.target.value = '';}
 });
 async function initialize() {
+  if (browserLocalMode) {
+    cloudMode = true;
+    browserAvailable = false;
+    showApp();
+    await refresh();
+    return;
+  }
   try {
     const status = await api('auth/status');
     cloudMode = true;
