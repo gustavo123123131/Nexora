@@ -94,7 +94,7 @@ class DesktopChromiumConfigurationTests(unittest.TestCase):
             self.assertEqual(config['viewport'], {'width': 412, 'height': 915})
             self.assertIn('Pixel 7', config['user_agent'])
             self.assertTrue(config['accept_downloads'])
-            self.assertNotIn('locale', config)
+            self.assertEqual(config.get('locale'), runner_module.host_browser_locale())
             self.assertNotIn('timezone_id', config)
             # This application does not configure a residential proxy;
             # IP reputation belongs to the operating system/network.
