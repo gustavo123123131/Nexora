@@ -10,6 +10,7 @@ import os
 import queue
 import re
 import threading
+import time
 from concurrent.futures import Future
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -23,6 +24,11 @@ KEYS = {'Enter', 'Tab', 'Backspace', 'Escape', 'ArrowUp', 'ArrowDown',
         'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Delete', 'ControlOrMeta+A'}
 STORE = Path(os.environ.get('NEXORA_PROFILE_DIR', str(Path(__file__).resolve().parent / 'data' / 'profiles') if os.name == 'nt' else '/data/profiles'))
 MAX_PROFILES = max(1, min(6, int(os.environ.get('NEXORA_MAX_PROFILES', '3'))))
+# On Windows, this process belongs to the signed-in user's desktop session.
+# The Linux xvfb test can explicitly opt into headed mode.
+DESKTOP_MODE = os.name == 'nt' or os.environ.get('NEXORA_DESKTOP_MODE') == '1'
+AUTOSAVE_SECONDS = 3
+
 
 
 def valid_id(value):
@@ -53,6 +59,23 @@ def valid_url(value):
     return value
 
 
+def chromium_launch_options(pw):
+    """Preserve the actual Pixel 7 Playwright device profile in both modes."""
+    device = pw.devices['Pixel 7']
+    options = {key: value for key, value in device.items()
+               if key != 'default_browser_type'}
+    options.update(
+        headless=not DESKTOP_MODE,
+        locale='pt-BR',
+        timezone_id='America/Sao_Paulo',
+        accept_downloads=DESKTOP_MODE,
+        args=(['--window-size=520,900'] if os.name == 'nt' else
+              ['--no-sandbox', '--disable-dev-shm-usage'] +
+              (['--window-size=520,900'] if DESKTOP_MODE else [])),
+    )
+    return options
+
+
 class BrowserWorker:
     """All Playwright calls run on ONE dedicated Python thread."""
     def __init__(self):
@@ -65,17 +88,26 @@ class BrowserWorker:
     def _serve(self):
         playwright = None
         try:
+            next_backup = time.monotonic() + AUTOSAVE_SECONDS
             while True:
-                func, args, future = self.jobs.get()
-                if future.cancelled():
-                    continue
                 try:
-                    if playwright is None:
-                        playwright = sync_playwright().start()
-                    value = getattr(self, func)(playwright, *args)
-                    future.set_result(value)
-                except BaseException as exc:
-                    future.set_exception(exc)
+                    func, args, future = self.jobs.get(timeout=1)
+                except queue.Empty:
+                    func = None
+                if func is not None and not future.cancelled():
+                    try:
+                        if playwright is None:
+                            playwright = sync_playwright().start()
+                        value = getattr(self, func)(playwright, *args)
+                        future.set_result(value)
+                    except BaseException as exc:
+                        future.set_exception(exc)
+                if playwright is not None and time.monotonic() >= next_backup:
+                    # In native Windows mode there is NO screenshot polling:
+                    # save session cookies periodically while users browse
+                    # directly in visible Chromium windows.
+                    self._autosave()
+                    next_backup = time.monotonic() + AUTOSAVE_SECONDS
         finally:
             for context in self.contexts.values():
                 try:
@@ -84,6 +116,17 @@ class BrowserWorker:
                     pass
             if playwright:
                 playwright.stop()
+
+    def _autosave(self):
+        for pid, context in list(self.contexts.items()):
+            try:
+                self._save_cookies(context, pid)
+            except PlaywrightError:
+                # Closing a native window manually can close its context.
+                self.contexts.pop(pid, None)
+                self.cookie_backups.pop(pid, None)
+            except (OSError, ValueError) as exc:
+                app.logger.warning('Nao foi possivel salvar cookies do perfil %s: %s', pid, exc)
 
     def run(self, func, *args):
         future = Future()
@@ -159,16 +202,13 @@ class BrowserWorker:
 
     def start(self, pw, pid, url):
         if self.status(pw, pid)['running']:
-            return {'running': True, 'already_open': True}
+            return {'running': True, 'already_open': True, 'desktop': DESKTOP_MODE}
         if len(self.contexts) >= MAX_PROFILES:
             raise ValueError(f'Limite de {MAX_PROFILES} navegadores simultâneos.')
         STORE.mkdir(parents=True, exist_ok=True)
         profile_dir = STORE / pid
         profile_dir.mkdir(exist_ok=True)
-        opts = {k: v for k, v in pw.devices['Pixel 7'].items()
-                if k != 'default_browser_type'}
-        opts.update(headless=True, locale='pt-BR', accept_downloads=False,
-                    args=['--no-sandbox', '--disable-dev-shm-usage'] if os.name != 'nt' else [])
+        opts = chromium_launch_options(pw)
         context = pw.chromium.launch_persistent_context(str(profile_dir), **opts)
         self.contexts[pid] = context
         try:
@@ -176,11 +216,13 @@ class BrowserWorker:
             page = context.pages[0] if context.pages else context.new_page()
             page.set_default_timeout(8000)
             page.goto(url, wait_until='domcontentloaded', timeout=12000)
-            return {'running': True, 'already_open': False}
+            if DESKTOP_MODE:
+                page.bring_to_front()
+            return {'running': True, 'already_open': False, 'desktop': DESKTOP_MODE}
         except PlaywrightError:
             # A failed navigation must not discard the browser / persistent data.
-            return {'running': True, 'already_open': False,
-                    'warning': 'Navegador iniciou, mas o site não terminou de carregar.'}
+            return {'running': True, 'already_open': False, 'desktop': DESKTOP_MODE,
+                    'warning': 'Janela iniciada, mas o site não terminou de carregar.'}
         except Exception:
             try:
                 context.close()
@@ -294,7 +336,8 @@ def public_health():
 
 @app.get('/v1/health')
 def health():
-    return jsonify(ok=True, browser=True, mode='remote', max_profiles=MAX_PROFILES)
+    return jsonify(ok=True, browser=True, mode='remote', desktop=DESKTOP_MODE,
+                   device='Pixel 7', max_profiles=MAX_PROFILES)
 
 
 @app.get('/v1/status/<pid>')
