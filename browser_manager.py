@@ -1,7 +1,29 @@
 """Cada perfil usa um diretório Chromium e um processo independente."""
 import os
+import locale
+import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
+
+
+def _local_os_language():
+    # Legacy local launcher: keep Accept-Language aligned with Windows.
+    if os.name == 'nt':
+        import ctypes
+        buffer = ctypes.create_unicode_buffer(85)
+        if ctypes.windll.kernel32.GetUserDefaultLocaleName(buffer, len(buffer)):
+            value = buffer.value
+            if re.fullmatch(r'[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', value):
+                return value
+    try:
+        value = locale.getlocale()[0]
+    except (TypeError, ValueError):
+        value = None
+    if value:
+        value = value.replace('_', '-')
+        if re.fullmatch(r'[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', value):
+            return value
+    return None
 
 
 class BrowserManager:
@@ -51,6 +73,9 @@ class BrowserManager:
             # a different geographic environment on every local profile.
             args=[f"--window-size={device['viewport']['width'] + 150},{device['viewport']['height'] + 155}"],
         )
+        language = _local_os_language()
+        if language:
+            options['locale'] = language
         if self.executable_path:
             options['executable_path'] = self.executable_path
         self.starting.add(profile_id)
