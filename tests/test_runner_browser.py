@@ -94,6 +94,10 @@ class DesktopChromiumConfigurationTests(unittest.TestCase):
             self.assertEqual(config['viewport'], {'width': 412, 'height': 915})
             self.assertIn('Pixel 7', config['user_agent'])
             self.assertTrue(config['accept_downloads'])
+            self.assertNotIn('locale', config)
+            self.assertNotIn('timezone_id', config)
+            self.assertTrue(any(flag.startswith('--window-size=')
+                                for flag in config['args']))
         with patch.object(runner_module, 'DESKTOP_MODE', False):
             config = runner_module.chromium_launch_options(fake)
             self.assertIs(config['headless'], True)
