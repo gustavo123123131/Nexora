@@ -6,6 +6,7 @@ Remote control uses a high-entropy secret; never commit it to GitHub.
 import hmac
 import json
 import ipaddress
+import locale
 import os
 import queue
 import re
@@ -59,13 +60,39 @@ def valid_url(value):
     return value
 
 
+def host_browser_locale():
+    """Resolve the real user's OS language (BCP47), never impersonate a locale.
+
+    Playwright otherwise may omit Accept-Language while navigator.language is
+    still populated, so we explicitly pass the OS value to keep both aligned.
+    """
+    if os.name == 'nt':
+        import ctypes
+        buffer = ctypes.create_unicode_buffer(85)
+        if ctypes.windll.kernel32.GetUserDefaultLocaleName(buffer, len(buffer)):
+            language = buffer.value
+            if re.fullmatch(r'[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', language):
+                return language
+    try:
+        language = locale.getlocale()[0]
+    except (ValueError, TypeError):
+        language = None
+    if language:
+        language = language.replace('_', '-')
+        if re.fullmatch(r'[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', language):
+            return language
+    # The runtime is not reporting a supported locale; avoid inventing one.
+    return None
+
+
 def chromium_launch_options(pw):
     """Preserve the actual Pixel 7 Playwright device profile in both modes."""
     device = pw.devices['Pixel 7']
     options = {key: value for key, value in device.items()
                if key != 'default_browser_type'}
-    # Do not force pt-BR or America/Sao_Paulo: Playwright uses the actual
-    # host locale/timezone when unset. Emulation is not a real Android OS.
+    # Use the actual OS language so navigator.language and Accept-Language
+    # agree. Do not force a different geographic timezone or impersonate Android
+    # hardware: emulation is still Chromium on the host operating system.
     # The outer OS window needs room for the device viewport AND browser UI.
     viewport = device['viewport']
     outer_width = viewport['width'] + 150
@@ -79,6 +106,9 @@ def chromium_launch_options(pw):
         accept_downloads=DESKTOP_MODE,
         args=args,
     )
+    language = host_browser_locale()
+    if language:
+        options['locale'] = language
     return options
 
 
