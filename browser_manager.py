@@ -23,7 +23,8 @@ def _local_os_language():
         value = value.replace('_', '-')
         if re.fullmatch(r'[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*', value):
             return value
-    return None
+    # Chromium defaults to en-US under the POSIX C locale.
+    return 'en-US'
 
 
 class BrowserManager:
