@@ -46,7 +46,9 @@ async function refresh() {
 }
 function render() {
   $('#navProfileCount').textContent = state.profiles.length;
-  const active = state.profiles.filter(p => p.status === 'running').length;
+  const active = browserLocalMode && globalThis.NexoraRemote?.connected
+    ? state.profiles.filter(p => globalThis.NexoraRemote.isRunning(p.id)).length
+    : state.profiles.filter(p => p.status === 'running').length;
   $('#statProfiles').textContent = state.profiles.length;
   $('#statActive').textContent = active;
   $('#statSites').textContent = state.sites.length;
@@ -143,11 +145,21 @@ document.addEventListener('click', async event => {
     window.open(site.url, '_blank', 'noopener,noreferrer');
     return;
   }
+  if (action === 'remote-connect') return globalThis.NexoraRemote.connect();
+  if (action === 'remote-start') {
+    const profile = state.profiles.find(p => p.id === id);
+    const site = state.sites.find(s => s.id === profile?.site_id);
+    if (!site) return toast('Site não encontrado.', true);
+    return globalThis.NexoraRemote.start(id, site.url);
+  }
+  if (action === 'remote-stop') return globalThis.NexoraRemote.stop(id);
+  if (action === 'remote-view') return globalThis.NexoraRemote.view(id);
   if (action === 'start') return perform('profiles/start', {id}, 'Navegador iniciado. Faça login manualmente na janela aberta.');
   if (action === 'stop') return perform('profiles/stop', {id}, 'Perfil encerrado. Sessão salva.');
   if (action === 'delete-profile') {
     const profile = state.profiles.find(p => p.id === id);
-    if (confirm(`Excluir o perfil "${profile?.name || ''}"? ${browserAvailable ? 'Cookies e dados locais serão apagados definitivamente.' : (browserLocalMode ? 'O cadastro salvo neste navegador será removido.' : 'O registro será removido do banco de dados.')}`)) return perform('profiles/delete', {id}, 'Perfil excluído.');
+    if (browserLocalMode && globalThis.NexoraRemote?.isRunning(id)) return toast('Encerre o navegador remoto deste perfil antes de excluir o cadastro.', true);
+    if (confirm(`Excluir o perfil "${profile?.name || ''}"? ${browserLocalMode ? 'O cadastro neste navegador será removido, mas dados e cookies já salvos no executor REMOTO NÃO serão apagados.' : (browserAvailable ? 'Cookies e dados locais serão apagados definitivamente.' : 'O registro será removido do banco de dados.')}`)) return perform('profiles/delete', {id}, 'Perfil excluído.');
   }
   if (action === 'delete-site') {
     const site = state.sites.find(s => s.id === id);
@@ -263,3 +275,6 @@ globalThis.NexoraUIRemoteConnection = function (connected) {
   updateEnvironment();
   render();
 };
+
+// Remote Chromium controller reads ONLY metadata; session credentials stay in runner.
+globalThis.NexoraGetProfiles = () => state.profiles.slice();
