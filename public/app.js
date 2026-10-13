@@ -76,12 +76,20 @@ function renderProfiles() {
     const remoteReady = browserLocalMode && !!globalThis.NexoraRemote?.connected;
     const running = remoteReady ? globalThis.NexoraRemote.isRunning(profile.id) : profile.status === 'running';
     const unavailable = browserLocalMode ? !remoteReady : (profile.status === 'unavailable' || !browserAvailable);
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${unavailable ? 'unavailable' : (running ? 'running' : '')}">${unavailable ? '◌ Executor não conectado' : (running ? '● Em execução':'○ Parado')}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${unavailable ? (browserLocalMode
-      ? '<button class="btn btn-secondary" data-action="remote-connect" title="Conecte seu Chromium remoto para iniciar este perfil">Conectar navegador</button>'
-      : '<button class="btn btn-secondary" disabled>Navegador indisponível</button>')
-      : (remoteReady
-        ? `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'remote-stop':'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Abrir'}</button>${running ? `<button class="btn btn-ghost" data-action="remote-view" data-id="${profile.id}">Ver navegador</button>` : ''}`
-        : `<button class="btn ${running ? 'btn-secondary':'btn-primary'}" data-action="${running ? 'stop':'start'}" data-id="${profile.id}">${running ? '■ Encerrar':'▶ Iniciar'}</button>`))}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir perfil e seus dados" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    let actions = '';
+    if (browserLocalMode && !remoteReady) {
+      actions = '<button class="btn btn-secondary" data-action="remote-connect">Conectar navegador</button>';
+    } else if (remoteReady) {
+      actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'remote-stop' : 'remote-start'}" data-id="${profile.id}">${running ? '■ Encerrar' : '▶ Abrir'}</button>`;
+      if (running) actions += `<button class="btn btn-ghost" data-action="remote-view" data-id="${profile.id}">Ver navegador</button>`;
+    } else if (unavailable) {
+      actions = '<button class="btn btn-secondary" disabled>Navegador indisponível</button>';
+    } else {
+      actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'stop' : 'start'}" data-id="${profile.id}">${running ? '■ Encerrar' : '▶ Iniciar'}</button>`;
+    }
+    const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
+    const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
 }
 function renderSites() {
