@@ -7,6 +7,7 @@
   <title>Nexora — Gerenciamento de perfis</title>
   <link rel="stylesheet" href="/style.css">
   <script defer src="/local_store.js"></script>
+  <script defer src="/remote_browser.js"></script>
   <script defer src="/app.js"></script>
 </head>
 <body>
@@ -42,7 +43,7 @@
     <main class="content">
       <header class="topbar">
         <div class="breadcrumb">Workspace <span>/</span> <strong id="breadcrumbCurrent">Perfis</strong></div>
-        <div class="top-actions"><span class="connection"><i></i><span id="connectionLabel">Nexora</span></span><button type="button" class="btn btn-ghost" id="logoutButton" hidden>Sair</button><span class="avatar">NX</span></div>
+        <div class="top-actions"><button type="button" class="btn btn-ghost" id="runnerButton" hidden>Conectar navegador</button><span class="connection"><i></i><span id="connectionLabel">Nexora</span></span><button type="button" class="btn btn-ghost" id="logoutButton" hidden>Sair</button><span class="avatar">NX</span></div>
       </header>
       <div class="page">
         <section class="page-heading">
@@ -79,6 +80,33 @@
       <form id="modalForm"><div id="modalFields"></div><div class="form-actions"><button type="button" class="btn btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn btn-primary" id="modalSubmit">Salvar</button></div></form>
     </div>
   </div>
+  <section id="remoteViewer" class="remote-overlay" hidden aria-label="Navegador Chromium remoto">
+    <div class="remote-window">
+      <header class="remote-header">
+        <strong>Nexora · Navegador mobile independente</strong>
+        <button class="btn btn-secondary" type="button" id="remoteClose">Fechar visualização</button>
+      </header>
+      <div class="remote-toolbar">
+        <button type="button" class="btn btn-ghost" id="remoteBack">← Voltar</button>
+        <button type="button" class="btn btn-ghost" id="remoteReload">⟳ Atualizar</button>
+        <button type="button" class="btn btn-ghost" id="remoteScrollUp">↑ Rolar</button>
+        <button type="button" class="btn btn-ghost" id="remoteScrollDown">↓ Rolar</button>
+      </div>
+      <div class="remote-screen">
+        <img id="remoteFrame" alt="Tela do navegador Chromium remoto, clique para interagir" draggable="false">
+      </div>
+      <div class="remote-toolbar">
+        <label class="sr-only" for="remoteText">Texto para enviar ao navegador</label>
+        <input type="text" id="remoteText" placeholder="Texto para o campo selecionado (inclusive senha)" autocomplete="off">
+        <button type="button" class="btn btn-primary" id="remoteSendText">Enviar texto</button>
+        <button type="button" class="btn btn-secondary" id="remoteTab">Tab</button>
+        <button type="button" class="btn btn-secondary" id="remoteEnter">Enter</button>
+        <button type="button" class="btn btn-secondary" id="remoteBackspace">⌫</button>
+      </div>
+      <p class="remote-hint">Clique na imagem para focar um campo e envie o texto acima. Sessão e cookies permanecem no executor remoto, não neste site.</p>
+      <p id="remoteError" class="remote-error" role="alert"></p>
+    </div>
+  </section>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
