@@ -235,6 +235,11 @@ class BrowserWorker:
         context = self.contexts[pid]
         return [item['name'] for item in context.cookies()]
 
+    def _page_url_for_test(self, pw, pid):
+        """Read a headed Chromium page over Playwright, no screenshot."""
+        page = self.page(pid)
+        return {'url': page.url, 'input_count': page.locator('input').count()}
+
     def stop(self, pw, pid):
         context = self.contexts.get(pid)
         if context is None:
