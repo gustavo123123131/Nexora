@@ -9,6 +9,8 @@ const vm = require('node:vm');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(path.join(root, 'public', 'local_store.js'), 'utf8');
 const frontend = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
+const remote = fs.readFileSync(path.join(root, 'public', 'remote_browser.js'), 'utf8');
+const page = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const memory = new Map();
 let counter = 0;
 
@@ -32,6 +34,9 @@ function browserStore() {
 test('scripts are valid JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(frontend));
   assert.doesNotThrow(() => new vm.Script(source));
+  assert.doesNotThrow(() => new vm.Script(remote));
+  assert.match(page, /id="remoteViewer"/);
+  assert.match(page, /src="\/remote_browser\.js"/);
 });
 
 test('metadata persists, but sessions cannot be falsely launched', () => {
