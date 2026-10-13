@@ -1,7 +1,7 @@
-"""Nexora remote Chromium worker. Runs on a persistent Linux container, NOT Vercel.
+"""Nexora remote Chromium worker for Linux containers OR Windows via Cloudflare.
 
 All browser state is isolated under NEXORA_PROFILE_DIR/<profile-id>.
-Remote control uses a high-entropy secret; do not publish it to client code.
+Remote control uses a high-entropy secret; never commit it to GitHub.
 """
 import hmac
 import json
@@ -21,7 +21,7 @@ app = Flask(__name__)
 ID_RE = re.compile(r'^[0-9a-f]{32}$')
 KEYS = {'Enter', 'Tab', 'Backspace', 'Escape', 'ArrowUp', 'ArrowDown',
         'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Delete', 'ControlOrMeta+A'}
-STORE = Path(os.environ.get('NEXORA_PROFILE_DIR', '/data/profiles'))
+STORE = Path(os.environ.get('NEXORA_PROFILE_DIR', str(Path(__file__).resolve().parent / 'data' / 'profiles') if os.name == 'nt' else '/data/profiles'))
 MAX_PROFILES = max(1, min(6, int(os.environ.get('NEXORA_MAX_PROFILES', '3'))))
 
 
@@ -168,7 +168,7 @@ class BrowserWorker:
         opts = {k: v for k, v in pw.devices['Pixel 7'].items()
                 if k != 'default_browser_type'}
         opts.update(headless=True, locale='pt-BR', accept_downloads=False,
-                    args=['--no-sandbox', '--disable-dev-shm-usage'])
+                    args=['--no-sandbox', '--disable-dev-shm-usage'] if os.name != 'nt' else [])
         context = pw.chromium.launch_persistent_context(str(profile_dir), **opts)
         self.contexts[pid] = context
         try:
@@ -246,8 +246,21 @@ class BrowserWorker:
 worker = BrowserWorker()
 
 
+PANEL_ORIGIN = os.environ.get('NEXORA_PANEL_ORIGIN', 'https://nexora-ebon-eight.vercel.app').rstrip('/')
+
+
 @app.before_request
 def security():
+    # The Vercel frontend can call a temporary Cloudflare Tunnel directly,
+    # so its changing URL never needs to be entered into Vercel env vars.
+    # Only the exact trusted panel origin receives browser CORS permission.
+    origin = request.headers.get('Origin', '')
+    if request.method == 'OPTIONS':
+        if origin != PANEL_ORIGIN:
+            return jsonify(error='Origem não autorizada.'), 403
+        return app.response_class(status=204)
+    if origin and origin != PANEL_ORIGIN:
+        return jsonify(error='Origem não autorizada.'), 403
     if request.path == '/healthz':
         return None
     secret = os.environ.get('NEXORA_RUNNER_KEY', '')
@@ -263,6 +276,12 @@ def security():
 
 @app.after_request
 def headers(response):
+    if request.headers.get('Origin') == PANEL_ORIGIN:
+        response.headers['Access-Control-Allow-Origin'] = PANEL_ORIGIN
+        response.headers['Access-Control-Allow-Headers'] = 'Authorization, Content-Type'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Max-Age'] = '600'
+        response.headers['Vary'] = 'Origin'
     response.headers['Cache-Control'] = 'no-store'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     return response
@@ -335,4 +354,4 @@ def act():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '8080'))
-    app.run(host='0.0.0.0', port=port, threaded=True)
+    app.run(host=os.environ.get('NEXORA_BIND', '127.0.0.1'), port=port, threaded=True)
