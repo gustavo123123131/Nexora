@@ -7,6 +7,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
 from fingerprint_manager import FingerprintManager
 from session_manager import SessionManager
+from window_layout_manager import WindowLayoutManager
 
 
 def _local_os_language():
@@ -39,6 +40,7 @@ class BrowserManager:
         self.contexts = {}
         self.starting = set()
         self.sessions = SessionManager()
+        self.window_layouts = WindowLayoutManager(self.store.profiles_dir.parent)
 
     def _playwright(self):
         if self.playwright is None:
@@ -111,12 +113,23 @@ class BrowserManager:
         viewport = options['viewport']
         directory = self.store.profiles_dir / profile_id
         directory.mkdir(exist_ok=True)
+        bounds = None
+        if os.name == 'nt' and not self.headless:
+            try:
+                bounds = self.window_layouts.get(profile_id)
+            except ValueError as error:
+                if os.environ.get('MULTILOGIN_VERBOSE') == '1':
+                    print('[layout] Configuração de janela inválida:', type(error).__name__)
+        window_args = ([f"--window-position={bounds['left']},{bounds['top']}",
+                        f"--window-size={bounds['width']},{bounds['height']}"]
+                       if bounds else
+                       [f"--window-size={viewport['width'] + 150},{viewport['height'] + 155}"])
         options.update(
             headless=self.headless,
             accept_downloads=True,
             # Follow the machine's locale and timezone instead of imposing
             # a different geographic environment on every local profile.
-            args=[f"--window-size={viewport['width'] + 150},{viewport['height'] + 155}"],
+            args=window_args,
         )
         language = _local_os_language()
         if language:
@@ -133,6 +146,14 @@ class BrowserManager:
             context.on('close', lambda *args: self.contexts.pop(profile_id, None)
                        if self.contexts.get(profile_id) is context else None)
             page = context.pages[0] if context.pages else context.new_page()
+            if bounds is not None:
+                try:
+                    self.window_layouts.apply_to_context(context, bounds)
+                except Exception:
+                    # Window placement is optional: never fail the mobile
+                    # browser launch or the user's saved session over it.
+                    if os.environ.get('MULTILOGIN_VERBOSE') == '1':
+                        print('[layout] Não foi possível restaurar a posição da janela.')
             warning = None
             try:
                 page.goto(site['url'], wait_until='domcontentloaded', timeout=15000)
@@ -175,7 +196,23 @@ class BrowserManager:
         result['running'] = True
         return result
 
+    def save_window_position(self, profile_id):
+        if os.name != 'nt' or self.headless:
+            raise ValueError('Salvamento de posições exige Chromium visível no Windows.')
+        if not self.is_running(profile_id):
+            raise ValueError('Abra o perfil antes de salvar sua posição.')
+        context = self.contexts[profile_id]
+        bounds = self.window_layouts.read_window(context)
+        return self.window_layouts.save(profile_id, bounds)
+
     def stop(self, profile_id):
+        if os.name == 'nt' and not self.headless and profile_id in self.contexts:
+            try:
+                self.save_window_position(profile_id)
+            except Exception:
+                # Do not allow window-position metadata to prevent saving
+                # session cookies or gracefully closing an active browser.
+                pass
         context = self.contexts.pop(profile_id, None)
         if context is None:
             return False
