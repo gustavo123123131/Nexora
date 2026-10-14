@@ -54,6 +54,10 @@ class HttpTests(unittest.TestCase):
                 self.assertIn('text/html', headers.get('Content-Type'))
                 self.assertIn('application/javascript', req('/app.js')[2]['Content-Type'])
                 self.assertIn('text/css', req('/style.css')[2]['Content-Type'])
+                self.assertIn('application/javascript', req('/local_store.js')[2]['Content-Type'])
+                catalog = json.loads(req('/device_catalog.json')[1])
+                self.assertGreaterEqual(len(catalog['devices']), 40)
+                self.assertIn('Galaxy S24', catalog['devices'])
                 self.assertEqual(json.loads(req('/api/state')[1])['profiles'], [])
                 with self.assertRaises(urllib.error.HTTPError) as error:
                     req('/api/sites/create', {'name':'Bloqueio','url':'https://example.com'}, origin=False)
@@ -63,6 +67,14 @@ class HttpTests(unittest.TestCase):
                 initial_state = json.loads(req('/api/state')[1])
                 self.assertEqual(initial_state['sites'][0]['name'], 'Teste')
                 self.assertEqual(initial_state['profiles'][0]['status'], 'stopped')
+                self.assertEqual(initial_state['profiles'][0]['device'], 'Pixel 7')
+                changed = json.loads(req('/api/profiles/update', {
+                    'id':profile['id'], 'name':'Conta Alterada',
+                    'site_id':site['id'], 'device':'Galaxy S24'})[1])
+                self.assertEqual(changed['device'], 'Galaxy S24')
+                current = json.loads(req('/api/state')[1])['profiles'][0]
+                self.assertEqual(current['device'], 'Galaxy S24')
+                self.assertEqual(current['name'], 'Conta Alterada')
                 site = json.loads(req('/api/sites/update', {'id':site['id'],'name':'Novo nome', 'url':'https://example.org'})[1])
                 self.assertEqual(site['name'], 'Novo nome')
                 with self.assertRaises(urllib.error.HTTPError) as error:
