@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from uuid import uuid4
 from urllib.parse import urlsplit
+from fingerprint_manager import FingerprintManager
 
 # Match the signed-off Playwright device catalog used by the Windows runner.
 _CATALOG_PATH = Path(__file__).resolve().parent / 'runner' / 'device_catalog.json'
@@ -59,6 +60,17 @@ class Store:
                 value = json.load(fp)
             self.sites = value['sites']
             self.profiles = value['profiles']
+            # Non-destructive migration of legacy records: the selected model
+            # remains identical and each profile receives a pinned snapshot.
+            changed = False
+            for profile in self.profiles:
+                if 'fingerprint' not in profile:
+                    profile['device'] = validate_device(profile.get('device'))
+                    profile['fingerprint'] = FingerprintManager.generate(
+                        profile['device'], reason='legacy-migration')
+                    changed = True
+            if changed:
+                self.save()
         else:
             self.sites, self.profiles = [], []
             self.save()
@@ -102,8 +114,11 @@ class Store:
     def create_profile(self, name, site_id, device=None):
         if not self.site(site_id):
             raise ValueError('Selecione um site cadastrado.')
+        selected = validate_device(device)
         item = {'id': uuid4().hex, 'name': validate_name(name, 'nome do perfil'),
-                'site_id': site_id, 'device': validate_device(device)}
+                'site_id': site_id, 'device': selected,
+                'fingerprint': FingerprintManager.generate(selected),
+                'instance_id': 'local-default'}
         self.profiles.append(item)
         self.save()
         return item
@@ -116,9 +131,33 @@ class Store:
             raise ValueError('Selecione um site cadastrado.')
         new_name = validate_name(name, 'nome do perfil')
         new_device = validate_device(device)
+        if new_device != item.get('device'):
+            # Changing model explicitly also selects a different official
+            # emulation descriptor. Do not regenerate on ordinary rename.
+            item['fingerprint'] = FingerprintManager.generate(
+                new_device, reason='user-changed-device')
         item.update(name=new_name, site_id=site_id, device=new_device)
         self.save()
         return item
+
+    def duplicate_profile(self, profile_id):
+        original = self.profile(profile_id)
+        if original is None:
+            raise LookupError('Perfil não encontrado.')
+        base = original['name']
+        suffix = ' (cópia)'
+        return self.create_profile(base[:80 - len(suffix)] + suffix,
+                                   original['site_id'], original.get('device'))
+
+    def regenerate_fingerprint(self, profile_id):
+        original = self.profile(profile_id)
+        if original is None:
+            raise LookupError('Perfil não encontrado.')
+        selected = validate_device(original.get('device'))
+        original['fingerprint'] = FingerprintManager.generate(
+            selected, reason='user-explicit-regeneration')
+        self.save()
+        return original
 
     def delete_profile(self, profile_id):
         if not self.profile(profile_id):
