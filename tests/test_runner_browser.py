@@ -132,6 +132,28 @@ class MultiDeviceChromiumTests(unittest.TestCase):
                     finally:
                         manager.run('stop', first)
                         manager.run('stop', second)
+
+                    # A fresh worker is equivalent to restarting the local
+                    # executor: nothing may depend on in-memory profile state.
+                    restarted = runner_module.BrowserWorker()
+                    try:
+                        reopened_a = restarted.run('start', first, base + '/plain')
+                        reopened_b = restarted.run('start', second, base + '/plain')
+                        self.assertEqual(reopened_a['device'], 'Nexus 5')
+                        self.assertEqual(reopened_b['device'], 'Galaxy S9+')
+                        self.assertEqual(restarted.run('_profile_state_for_test', first)['local_storage'],
+                                         'account-A')
+                        self.assertEqual(restarted.run('_profile_state_for_test', second)['local_storage'],
+                                         'account-B')
+                        self.assertIn('first_profile',
+                                      restarted.run('_cookie_names_for_test', first))
+                        self.assertIn('second_profile',
+                                      restarted.run('_cookie_names_for_test', second))
+                        self.assertNotIn('first_profile',
+                                         restarted.run('_cookie_names_for_test', second))
+                    finally:
+                        restarted.run('stop', first)
+                        restarted.run('stop', second)
         finally:
             fixture.shutdown()
             fixture.server_close()
