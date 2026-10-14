@@ -71,6 +71,17 @@ class HttpTests(unittest.TestCase):
                 sessions = json.loads(req('/api/sessions')[1])
                 self.assertGreaterEqual(sessions['max_simultaneous'], 1)
                 self.assertEqual(sessions['sessions'][0]['status'], 'stopped')
+                # Selected-session endpoints are opt-in; they must not start
+                # a browser for malformed ids or a layout-only request.
+                with self.assertRaises(urllib.error.HTTPError) as error:
+                    req('/api/sessions/start-selected', {'ids': [profile['id'], profile['id']]})
+                self.assertEqual(error.exception.code, 400)
+                with self.assertRaises(urllib.error.HTTPError) as error:
+                    req('/api/windows/arrange-selected', {'ids': [profile['id']]})
+                self.assertEqual(error.exception.code, 400)
+                self.assertEqual(json.loads(req('/api/sessions/stop-selected',
+                                              {'ids': [profile['id']]})[1])['already_stopped'],
+                                 [profile['id']])
                 changed = json.loads(req('/api/profiles/update', {
                     'id':profile['id'], 'name':'Conta Alterada',
                     'site_id':site['id'], 'device':'Galaxy S24'})[1])
