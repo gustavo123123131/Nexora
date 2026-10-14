@@ -64,6 +64,7 @@ function render() {
   $('#breadcrumbCurrent').textContent = page === 'profiles' ? 'Perfis' : 'Sites';
   for (const id of selectedProfiles) if (!state.profiles.some(p => p.id === id)) selectedProfiles.delete(id);
   $('#bulkActions').hidden = !localhostDeviceMode || page !== 'profiles' || !state.profiles.length;
+  $('#legacyImportBar').hidden = !localhostDeviceMode || page !== 'profiles';
   $('#bulkSelectedCount').textContent = selectedProfiles.size + ' selecionados (máx. 12)';
   $('#pageDescription').textContent = page === 'profiles'
     ? (browserAvailable ? 'Gerencie navegadores independentes com experiência mobile Android.' : 'Cadastre e organize perfis na nuvem. Navegadores externos ainda não estão conectados.')
@@ -172,6 +173,34 @@ async function perform(route, payload, successText) {
     document.querySelectorAll('button[data-action], #modalSubmit').forEach(b => b.disabled = false);
   }
 }
+$('#legacyImportButton').addEventListener('click', () => {
+  if (localhostDeviceMode && !busy) $('#legacyImportFile').click();
+});
+$('#legacyImportFile').addEventListener('change', async event => {
+  const file = event.target.files[0];
+  if (!file || !localhostDeviceMode || busy) return;
+  try {
+    if (file.size > 6000) throw new Error('settings.json excede 6 KB. Remova dados privados desnecessários.');
+    const original = JSON.parse(await file.text());
+    // Send only the three settings needed to create mobile instances.
+    // Do not send credentials, user records, proxy settings or other fields.
+    const configuration = {
+      url: original.url, mode: original.mode, count: original.count
+    };
+    const preview = await api('lixocpa/preview', {configuration});
+    const detail = preview.profiles_to_create + ' novos perfis mobile, ' +
+      preview.urls.length + ' URLs; modo original: ' + preview.mode +
+      '. NÃO transfere cookies, contas, proxies ou extensões. Continuar?';
+    if (!confirm(detail)) return;
+    await perform('lixocpa/import', {configuration, confirmed:true},
+      'Instâncias do LIXOCPA importadas como perfis mobile novos.');
+  } catch (error) {
+    toast('Importação LIXOCPA: ' + error.message, true);
+  } finally {
+    event.target.value = '';
+  }
+});
+
 document.addEventListener('change', event => {
   const input = event.target.closest('input[data-profile-id]');
   if (!input || !localhostDeviceMode) return;
@@ -198,9 +227,15 @@ document.addEventListener('click', async event => {
     arrange: 'windows/arrange-selected'
   }[action];
   if (!route) return;
+  let interval_ms = 0;
+  if (action === 'start') {
+    interval_ms = Number($('#batchInterval').value);
+    if (!Number.isInteger(interval_ms) || interval_ms < 0 || interval_ms > 750)
+      return toast('Intervalo deve ser inteiro entre 0 e 750 ms.', true);
+  }
   busy = true;
   try {
-    const result = await api(route, {ids});
+    const result = await api(route, {ids, interval_ms});
     const count = (result.started || result.stopped || result.arranged || []).length;
     const failures = Object.keys(result.errors || {}).length;
     const warnings = Object.keys(result.warnings || {}).length;
