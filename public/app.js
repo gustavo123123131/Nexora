@@ -202,11 +202,13 @@ document.addEventListener('click', async event => {
     const result = await api(route, {ids});
     const count = (result.started || result.stopped || result.arranged || []).length;
     const failures = Object.keys(result.errors || {}).length;
+    const warnings = Object.keys(result.warnings || {}).length;
     const pending = (result.not_attempted || []).length;
     await refresh();
-    toast(count + ' perfis processados.' + (failures || pending
-      ? ' ' + failures + ' erros e ' + pending + ' não iniciados. Verifique sessões e janela do terminal.' : ''),
-      failures > 0 || pending > 0);
+    toast(count + ' perfis processados.' + (failures || pending || warnings
+      ? ' ' + failures + ' erros, ' + warnings + ' avisos e ' + pending +
+        ' não iniciados. Verifique sessões e janela do terminal.' : ''),
+      failures > 0 || pending > 0 || warnings > 0);
   } catch (error) {
     toast('Operação de multilogin: ' + error.message, true);
   } finally { busy = false; }
