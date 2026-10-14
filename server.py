@@ -3,6 +3,7 @@ import json
 import os
 import re
 import signal
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -162,6 +163,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, data)
         except (ValueError, LookupError, TypeError) as ex:
             return self.send_json(400, {'error': str(ex)})
+        except FileNotFoundError as ex:
+            return self.send_json(503, {'error': str(ex)})
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return self.send_json(503, {'error': 'Falha ao comunicar com Android. '
+                                              'Confira cabo USB, autorização e adb/scrcpy.'})
         except Exception as ex:
             # Não mostra stack traces, caminhos internos ou credenciais no navegador.
             print(f'[erro interno] {type(ex).__name__}: {ex}', file=sys.stderr)
