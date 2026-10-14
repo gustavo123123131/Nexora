@@ -65,13 +65,19 @@ class FingerprintManager:
         if version('playwright') != CATALOG['playwright_version']:
             raise ValueError('Playwright atualizado: revise o preset antes de regenerar.')
         descriptor = playwright.devices.get(snapshot['preset'])
+        # The Playwright Python bridge may normalize a device's optional
+        # screen differently from the original JSON descriptor. Pin it to the
+        # documented source for this snapshot, not to runtime defaults.
         differences = [key for key, value in snapshot['descriptor'].items()
-                       if descriptor.get(key) != value]
+                       if key != 'screen' and descriptor.get(key) != value]
         if differences:
             raise ValueError('Descritor em execução diferente do snapshot salvo: ' +
                              ', '.join(differences))
-        return {key: deepcopy(value) for key, value in descriptor.items()
-                if key != 'default_browser_type'}
+        options = {key: deepcopy(value) for key, value in descriptor.items()
+                   if key != 'default_browser_type'}
+        if 'screen' in snapshot['descriptor']:
+            options['screen'] = deepcopy(snapshot['descriptor']['screen'])
+        return options
 
     @staticmethod
     def inspect(context, snapshot, *, locale=None):
@@ -124,6 +130,8 @@ class FingerprintManager:
             'devicePixelRatio': abs(observed['devicePixelRatio'] - expected['device_scale_factor']) < 0.01,
             'touch': observed['maxTouchPoints'] > 0 if expected['has_touch'] else observed['maxTouchPoints'] == 0,
         }
+        if 'screen' in expected:
+            comparisons['screen'] = observed['screen'] == expected['screen']
         if locale:
             comparisons['language'] = observed['language'].lower() == locale.lower()
         warnings = [
