@@ -115,7 +115,7 @@ configurar NEXORA_RUNNER_URL na Vercel, contratar Railway ou comprar domínio.
   garantia de operação 24/7 sem manter o PC ligado.
 - Se houver um arquivo \`~/.cloudflared/config.yaml\`, o Quick Tunnel
   pode exigir que você o mova temporariamente para outro nome.
-- O Chromium usa **emulação mobile** (Pixel 7), não Android real.
+- O Chromium usa **emulação mobile por perfil** (Pixel 7, Pixel 5, Galaxy S9+, Galaxy S5 ou Nexus 5), não Android real. Escolha o modelo em **Criar perfil** ou **Editar perfil**, com o navegador encerrado. A configuração fica no cadastro local do painel e em `runner/data/profiles/<id>/.nexora-device.json`, junto do perfil persistente.
   A visualização funciona com capturas periódicas da tela; não é vídeo fluido.
   Sites com antifraude ou login complexo podem não funcionar.
 - As sessões antigas de \`data/profiles\` (do servidor localhost) NÃO são
