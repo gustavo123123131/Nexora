@@ -153,6 +153,8 @@ class Handler(BaseHTTPRequestHandler):
             elif route == '/api/windows/arrange-selected':
                 data = self.server.multilogin.arrange_selected(body.get('ids'),
                     body.get('columns'))
+            elif route == '/api/windows/save-position':
+                data = {'bounds': manager.save_window_position(body.get('id'))}
             else:
                 return self.send_json(404, {'error': 'Operação não encontrada.'})
             return self.send_json(200, data)
