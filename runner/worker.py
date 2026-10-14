@@ -29,11 +29,14 @@ MAX_PROFILES = max(1, min(6, int(os.environ.get('NEXORA_MAX_PROFILES', '3'))))
 # The Linux xvfb test can explicitly opt into headed mode.
 DESKTOP_MODE = os.name == 'nt' or os.environ.get('NEXORA_DESKTOP_MODE') == '1'
 AUTOSAVE_SECONDS = 3
-# Supported Chromium-compatible Android presets from Playwright 1.57.
-# Server-side allowlist prevents arbitrary browser arguments or user-agent
-# strings from being supplied via the public control-panel API.
-DEVICE_MODELS = ('Pixel 7', 'Pixel 5', 'Galaxy S9+', 'Galaxy S5', 'Nexus 5')
-DEFAULT_DEVICE = 'Pixel 7'
+# Shared catalog generated from the pinned Playwright 1.57 device descriptors.
+# Only documented Android/Chromium presets may be selected through the API.
+_DEVICE_CATALOG = json.loads((Path(__file__).resolve().parent / 'device_catalog.json')
+                             .read_text(encoding='utf-8'))
+DEVICE_MODELS = tuple(_DEVICE_CATALOG['devices'])
+DEFAULT_DEVICE = _DEVICE_CATALOG['default_device']
+if DEFAULT_DEVICE not in DEVICE_MODELS or len(set(DEVICE_MODELS)) != len(DEVICE_MODELS):
+    raise RuntimeError('Catálogo de dispositivos inválido.')
 
 
 def validate_device(device):
@@ -103,9 +106,15 @@ def host_browser_locale():
 def chromium_launch_options(pw, device_name=DEFAULT_DEVICE):
     """Use an approved, real Playwright Android device descriptor per profile."""
     name = validate_device(device_name)
-    device = pw.devices[name]
-    if device.get('default_browser_type') != 'chromium':
-        raise ValueError('Este modelo não é suportado pelo Chromium.')
+    try:
+        device = pw.devices[name]
+    except KeyError as exc:
+        raise ValueError('Este modelo não está disponível na versão instalada do Playwright.') from exc
+    if (device.get('default_browser_type') != 'chromium'
+            or not device.get('is_mobile')
+            or not device.get('has_touch')
+            or 'Android' not in device.get('user_agent', '')):
+        raise ValueError('Este modelo não é um preset Android Chromium compatível.')
     options = {key: value for key, value in device.items()
                if key != 'default_browser_type'}
     # Use the actual OS language so navigator.language and Accept-Language
