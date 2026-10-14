@@ -145,13 +145,31 @@
 
   async function fetchStatuses() {
     const profiles = globalThis.NexoraGetProfiles?.() || [];
-    await Promise.all(profiles.map(async profile => {
-      try {
-        const status = await api('status/' + profile.id);
-        if (status.running) running.add(profile.id);
-        else running.delete(profile.id);
-      } catch (_) {running.delete(profile.id);}
-    }));
+    if (!profiles.length) {
+      running.clear();
+      refreshPanel();
+      return;
+    }
+    try {
+      // The Windows executor enumerates ACTIVE contexts in one request.
+      // 5,000 saved registrations still cost one tunnel round trip.
+      const result = await api('statuses');
+      if (!Array.isArray(result.running_ids)) throw new Error('Legacy runner');
+      const saved = new Set(profiles.map(profile => profile.id));
+      running.clear();
+      for (const id of result.running_ids) if (saved.has(id)) running.add(id);
+    } catch (_) {
+      // Older executors still work. Bound concurrency on their legacy route.
+      for (let i = 0; i < profiles.length; i += 10) {
+        await Promise.all(profiles.slice(i, i + 10).map(async profile => {
+          try {
+            const status = await api('status/' + profile.id);
+            if (status.running) running.add(profile.id);
+            else running.delete(profile.id);
+          } catch (_) { running.delete(profile.id); }
+        }));
+      }
+    }
     refreshPanel();
   }
 
