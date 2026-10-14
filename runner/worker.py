@@ -113,7 +113,8 @@ def chromium_launch_options(pw, device_name=DEFAULT_DEVICE):
     if (device.get('default_browser_type') != 'chromium'
             or not device.get('is_mobile')
             or not device.get('has_touch')
-            or 'Android' not in device.get('user_agent', '')):
+            or 'Android' not in device.get('user_agent', '')
+            or 'Windows Phone' in device.get('user_agent', '')):
         raise ValueError('Este modelo não é um preset Android Chromium compatível.')
     options = {key: value for key, value in device.items()
                if key != 'default_browser_type'}
