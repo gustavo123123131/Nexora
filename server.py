@@ -15,6 +15,7 @@ from storage import Store
 from browser_manager import BrowserManager
 from device_profile_manager import DeviceProfileManager
 from multilogin_controller import MultiLoginController
+from lixocpa_import import build_legacy_mobile_plan, import_legacy_mobile_settings
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / 'public'
@@ -147,7 +148,16 @@ class Handler(BaseHTTPRequestHandler):
             elif route == '/api/profiles/stop':
                 data = {'stopped': manager.stop(body.get('id'))}
             elif route == '/api/sessions/start-selected':
-                data = self.server.multilogin.start_selected(body.get('ids'))
+                data = self.server.multilogin.start_selected(
+                    body.get('ids'), body.get('interval_ms', 0))
+            elif route == '/api/lixocpa/preview':
+                data = build_legacy_mobile_plan(
+                    body.get('configuration'), body.get('device'))
+            elif route == '/api/lixocpa/import':
+                if body.get('confirmed') is not True:
+                    raise ValueError('Confirme a importação de novos perfis.')
+                data = import_legacy_mobile_settings(
+                    store, body.get('configuration'), body.get('device'))
             elif route == '/api/sessions/stop-selected':
                 data = self.server.multilogin.stop_selected(body.get('ids'))
             elif route == '/api/windows/arrange-selected':

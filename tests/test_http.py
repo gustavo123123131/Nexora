@@ -127,6 +127,27 @@ class HttpTests(unittest.TestCase):
                 req('/api/sites/delete', {'id':site['id']})
                 self.assertEqual(json.loads(req('/api/state')[1])['sites'], [])
                 self.assertEqual(json.loads(req('/api/state')[1])['profiles'], [])
+                # Legacy LIXOCPA settings import is explicit and strips private
+                # account/proxy fields; it must never open a Chromium instance.
+                legacy_config = {'url': 'https://example.org',
+                                 'mode': 'celular', 'count': 2,
+                                 'proxy_raw': 'DO_NOT_COPY_PRIVATE_PROXY'}
+                preview = json.loads(req('/api/lixocpa/preview',
+                                         {'configuration': legacy_config})[1])
+                self.assertEqual(preview['profiles_to_create'], 2)
+                with self.assertRaises(urllib.error.HTTPError) as requires_approval:
+                    req('/api/lixocpa/import', {'configuration': legacy_config})
+                self.assertEqual(requires_approval.exception.code, 400)
+                result = json.loads(req('/api/lixocpa/import', {
+                    'configuration': legacy_config, 'confirmed': True})[1])
+                self.assertEqual(result['profiles_created'], 2)
+                after_legacy = json.loads(req('/api/state')[1])
+                self.assertEqual(len(after_legacy['profiles']), 2)
+                self.assertEqual(len(after_legacy['sites']), 1)
+                self.assertFalse(any(p['status'] == 'running'
+                                     for p in after_legacy['profiles']))
+                self.assertNotIn('DO_NOT_COPY_PRIVATE_PROXY',
+                                 (Path(folder) / 'settings.json').read_text())
             finally:
                 process.terminate()
                 try:

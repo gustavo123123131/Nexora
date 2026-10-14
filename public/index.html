@@ -59,8 +59,14 @@
             <article class="stat"><span class="stat-label">Sites vinculados</span><div><strong id="statSites">0</strong><span class="stat-icon blue">◎</span></div><small>Endereços disponíveis</small></article>
           </div>
           <div class="section-title"><div><h2>Lista de perfis</h2><span>Perfis independentes cadastrados</span></div><span class="helper" id="profileHelper"><i></i> Configurações independentes</span></div>
+          <div id="legacyImportBar" class="bulk-actions" hidden>
+            <span>Importar somente sites e instâncias mobile de um settings.json do LIXOCPA (sem contas/cookies)</span>
+            <button type="button" id="legacyImportButton" class="btn btn-ghost">Importar LIXOCPA</button>
+            <input type="file" id="legacyImportFile" accept=".json,application/json" hidden>
+          </div>
           <div id="bulkActions" class="bulk-actions" hidden>
             <span id="bulkSelectedCount">0 selecionados</span>
+            <label class="launch-interval">Intervalo entre aberturas (ms) <input id="batchInterval" type="number" min="0" max="750" step="50" value="250"></label>
             <button type="button" class="btn btn-primary" data-bulk-action="start">Abrir selecionados</button>
             <button type="button" class="btn btn-ghost" data-bulk-action="arrange">Organizar janelas</button>
             <button type="button" class="btn btn-secondary" data-bulk-action="stop">Encerrar selecionados</button>

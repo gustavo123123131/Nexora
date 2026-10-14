@@ -78,3 +78,10 @@
 .profile-select{display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;font-size:11px;color:#cbd5e8;padding:0 5px}
 .profile-select input{width:17px;height:17px;accent-color:#7598ed;cursor:pointer}
 @media(max-width:540px){.bulk-actions .btn{flex:1 1 auto}.profile-select{padding:0 2px}}
+
+/* Imported LIXOCPA instance plans remain mobile Chromium sessions. */
+.launch-interval{display:flex;align-items:center;gap:6px;font-size:12px;color:#b7c5df}
+.launch-interval input{width:74px;border:1px solid #415270;border-radius:7px;padding:5px;background:#101826;color:#eff3ff}
+#legacyImportBar{margin-top:6px}
+#legacyImportBar span{max-width:640px}
+@media(max-width:600px){.launch-interval{flex-basis:100%}}
