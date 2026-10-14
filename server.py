@@ -166,7 +166,7 @@ class LocalServer(HTTPServer):
         self.device_profiles = DeviceProfileManager(self.store, self.manager)
 
 
-def open_local_panel():
+def open_local_panel(*, prefer_bundled=None):
     """Launch the control panel in bundled blue Chromium on Windows.
 
     The panel has its own data directory and never shares profile cookies.
@@ -174,7 +174,7 @@ def open_local_panel():
     This does not change the browser engine for any saved mobile profile.
     """
     url = f'http://127.0.0.1:{PORT}'
-    if os.name != 'nt':
+    if not (os.name == 'nt' if prefer_bundled is None else prefer_bundled):
         webbrowser.open(url)
         return
     try:
@@ -190,7 +190,7 @@ def open_local_panel():
             '--no-first-run', '--new-window', url
         ], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL)
-    except (OSError, RuntimeError, ValueError) as exc:
+    except Exception as exc:
         print(f'[painel] Chromium não iniciou ({type(exc).__name__}); '
               'abrindo navegador padrão.', file=sys.stderr)
         webbrowser.open(url)
