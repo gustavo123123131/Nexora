@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
 from fingerprint_manager import FingerprintManager
+from session_manager import SessionManager
 
 
 def _local_os_language():
@@ -37,6 +38,7 @@ class BrowserManager:
         self.playwright = None
         self.contexts = {}
         self.starting = set()
+        self.sessions = SessionManager()
 
     def _playwright(self):
         if self.playwright is None:
@@ -90,6 +92,7 @@ class BrowserManager:
             return True
         except PlaywrightError:
             self.contexts.pop(profile_id, None)
+            self.sessions.stopped(profile_id)
             return False
 
     def start(self, profile_id):
@@ -120,6 +123,7 @@ class BrowserManager:
             options['locale'] = language
         if self.executable_path:
             options['executable_path'] = self.executable_path
+        self.sessions.begin(profile_id, len(self.contexts))
         self.starting.add(profile_id)
         context = None
         try:
@@ -136,8 +140,10 @@ class BrowserManager:
                 if os.environ.get('MULTILOGIN_VERBOSE') == '1':
                     print('Aviso de navegacao:', repr(ex))
                 warning = 'Janela aberta, mas o site não carregou. Confira a URL, a conexão e eventuais restrições do navegador.'
+            self.sessions.running(profile_id)
             return {'already_open': False, 'warning': warning}
-        except Exception:
+        except Exception as exc:
+            self.sessions.error(profile_id, exc)
             if context is not None:
                 try:
                     context.close()
@@ -173,6 +179,7 @@ class BrowserManager:
         context = self.contexts.pop(profile_id, None)
         if context is None:
             return False
+        self.sessions.stopping(profile_id)
         try:
             self._save_session_cookies(context, profile_id)
         except PlaywrightError:
@@ -182,6 +189,7 @@ class BrowserManager:
                 context.close()
             except PlaywrightError:
                 pass
+            self.sessions.stopped(profile_id)
         return True
 
     def stop_all(self):
@@ -190,6 +198,10 @@ class BrowserManager:
         if self.playwright is not None:
             self.playwright.stop()
             self.playwright = None
+
+    def session_details(self):
+        return [self.sessions.describe(profile['id'], self.is_running(profile['id']))
+                for profile in self.store.profiles]
 
     def status(self):
         return {profile['id']: ('running' if self.is_running(profile['id']) else 'stopped')
