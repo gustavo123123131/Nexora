@@ -6,6 +6,7 @@ import signal
 import sys
 import threading
 import webbrowser
+import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
@@ -165,6 +166,36 @@ class LocalServer(HTTPServer):
         self.device_profiles = DeviceProfileManager(self.store, self.manager)
 
 
+def open_local_panel():
+    """Launch the control panel in bundled blue Chromium on Windows.
+
+    The panel has its own data directory and never shares profile cookies.
+    A failed Chromium launch falls back to the user's default browser.
+    This does not change the browser engine for any saved mobile profile.
+    """
+    url = f'http://127.0.0.1:{PORT}'
+    if os.name != 'nt':
+        webbrowser.open(url)
+        return
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as playwright:
+            binary = Path(playwright.chromium.executable_path)
+        if not binary.is_file():
+            raise FileNotFoundError('Chromium do Playwright não foi instalado.')
+        panel_dir = DATA / 'panel-chromium'
+        panel_dir.mkdir(parents=True, exist_ok=True)
+        subprocess.Popen([
+            str(binary), f'--user-data-dir={panel_dir}',
+            '--no-first-run', '--new-window', url
+        ], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f'[painel] Chromium não iniciou ({type(exc).__name__}); '
+              'abrindo navegador padrão.', file=sys.stderr)
+        webbrowser.open(url)
+
+
 def main():
     server = LocalServer()
     print('\n' + '=' * 52)
@@ -173,7 +204,7 @@ def main():
     print(' Use Ctrl+C para encerrar e fechar os perfis.')
     print('=' * 52 + '\n', flush=True)
     if os.environ.get('MULTILOGIN_NO_OPEN') != '1':
-        threading.Timer(0.9, lambda: webbrowser.open(f'http://127.0.0.1:{PORT}')).start()
+        threading.Timer(0.9, open_local_panel).start()
     try:
         server.serve_forever(poll_interval=0.25)
     except KeyboardInterrupt:
