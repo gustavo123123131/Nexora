@@ -2,6 +2,7 @@
 import os
 import locale
 import re
+import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
 
@@ -40,6 +41,43 @@ class BrowserManager:
         if self.playwright is None:
             self.playwright = sync_playwright().start()
         return self.playwright
+
+    def _session_cookie_path(self, profile_id):
+        return self.store.profiles_dir / profile_id / '.nexora-session-cookies.json'
+
+    def _save_session_cookies(self, context, profile_id):
+        """Atomically back up session cookies before the browser is closed."""
+        path = self._session_cookie_path(profile_id)
+        contents = json.dumps(context.cookies(), ensure_ascii=False).encode('utf-8')
+        temp = path.with_suffix('.tmp')
+        descriptor = os.open(temp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(descriptor, 'wb') as stream:
+                stream.write(contents)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temp, path)
+        finally:
+            if temp.exists():
+                temp.unlink()
+
+    def _restore_session_cookies(self, context, profile_id):
+        path = self._session_cookie_path(profile_id)
+        if not path.exists():
+            return
+        cookies = json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(cookies, list):
+            raise ValueError('Backup de cookies inválido.')
+        prepared = []
+        for original in cookies:
+            if not isinstance(original, dict):
+                raise ValueError('Cookie inválido no backup.')
+            cookie = dict(original)
+            if cookie.get('expires', 0) <= 0:
+                cookie.pop('expires', None)
+            prepared.append(cookie)
+        if prepared:
+            context.add_cookies(prepared)
 
     def is_running(self, profile_id):
         context = self.contexts.get(profile_id)
@@ -90,6 +128,7 @@ class BrowserManager:
         context = None
         try:
             context = pw.chromium.launch_persistent_context(str(directory), **options)
+            self._restore_session_cookies(context, profile_id)
             self.contexts[profile_id] = context
             context.on('close', lambda *args: self.contexts.pop(profile_id, None)
                        if self.contexts.get(profile_id) is context else None)
@@ -118,9 +157,14 @@ class BrowserManager:
         if context is None:
             return False
         try:
-            context.close()
+            self._save_session_cookies(context, profile_id)
         except PlaywrightError:
-            pass
+            pass  # Browser was already closed manually.
+        finally:
+            try:
+                context.close()
+            except PlaywrightError:
+                pass
         return True
 
     def stop_all(self):
