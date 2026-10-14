@@ -42,6 +42,31 @@ class StorageTests(unittest.TestCase):
             store.delete_site(site['id'])
 
 
+class LocalDeviceMetadataTests(unittest.TestCase):
+    def test_models_and_edits_survive_local_server_restart(self):
+        from storage import DEVICE_MODELS, DEFAULT_DEVICE
+        self.assertGreaterEqual(len(DEVICE_MODELS), 40)
+        self.assertEqual(DEFAULT_DEVICE, 'Pixel 7')
+        with tempfile.TemporaryDirectory() as folder:
+            store = Store(folder)
+            site = store.create_site('Catálogo', 'https://example.org')
+            profiles = [
+                store.create_profile(f'Conta {i}', site['id'],
+                                     'Galaxy S24' if i % 2 else 'Pixel 7')
+                for i in range(200)
+            ]
+            self.assertEqual(len({p['id'] for p in profiles}), 200)
+            changed = store.update_profile(profiles[1]['id'], 'Editado',
+                                           site['id'], 'Galaxy A55')
+            self.assertEqual(changed['device'], 'Galaxy A55')
+            with self.assertRaises(ValueError):
+                store.create_profile('Invalido', site['id'], 'Model-Fake-999')
+            reloaded = Store(folder)
+            self.assertEqual(len(reloaded.profiles), 200)
+            self.assertEqual(reloaded.profile(profiles[1]['id'])['device'], 'Galaxy A55')
+            self.assertEqual(reloaded.profile(profiles[0]['id'])['device'], 'Pixel 7')
+
+
 class BrowserTests(unittest.TestCase):
     def test_mobile_cookie_isolation_and_persistence(self):
         fixture = ThreadingHTTPServer(('127.0.0.1', 0), WebFixture)
@@ -90,6 +115,41 @@ class BrowserTests(unittest.TestCase):
                     self.assertEqual(mgr.status()[p1['id']], 'stopped')
                 finally:
                     mgr.stop_all()
+        finally:
+            fixture.shutdown()
+            fixture.server_close()
+
+    def test_per_profile_mobile_models_launch_and_persist(self):
+        fixture = ThreadingHTTPServer(('127.0.0.1', 0), WebFixture)
+        Thread(target=fixture.serve_forever, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as folder:
+                store = Store(folder)
+                site = store.create_site('Device test',
+                    f'http://127.0.0.1:{fixture.server_address[1]}/')
+                first = store.create_profile('First', site['id'], 'Pixel 7')
+                second = store.create_profile('Second', site['id'], 'Galaxy S24')
+                manager = BrowserManager(store, headless=True)
+                try:
+                    manager.start(first['id'])
+                    manager.start(second['id'])
+                    page_a = manager.contexts[first['id']].pages[0]
+                    page_b = manager.contexts[second['id']].pages[0]
+                    a = page_a.evaluate('navigator.userAgent')
+                    b = page_b.evaluate('navigator.userAgent')
+                    self.assertIn('Pixel 7', a)
+                    self.assertIn('SM-S921', b)
+                    self.assertNotEqual(manager.contexts[first['id']].pages[0].viewport_size,
+                                        manager.contexts[second['id']].pages[0].viewport_size)
+                    manager.stop(first['id'])
+                    self.assertEqual(manager.status()[second['id']], 'running')
+                    manager.stop(second['id'])
+                finally:
+                    manager.stop_all()
+                # Re-read configuration from disk, not from the previous manager.
+                reloaded = Store(folder)
+                self.assertEqual(reloaded.profile(first['id'])['device'], 'Pixel 7')
+                self.assertEqual(reloaded.profile(second['id'])['device'], 'Galaxy S24')
         finally:
             fixture.shutdown()
             fixture.server_close()
