@@ -75,6 +75,23 @@ class HttpTests(unittest.TestCase):
                 current = json.loads(req('/api/state')[1])['profiles'][0]
                 self.assertEqual(current['device'], 'Galaxy S24')
                 self.assertEqual(current['name'], 'Conta Alterada')
+                self.assertEqual(current['fingerprint_version'], 1)
+                inspection = json.loads(req('/api/profiles/inspect/' + profile['id'])[1])
+                self.assertFalse(inspection['running'])
+                self.assertIsNone(inspection['observed'])
+                self.assertEqual(inspection['configured']['preset'], 'Galaxy S24')
+                with self.assertRaises(urllib.error.HTTPError) as missing_confirmation:
+                    req('/api/profiles/regenerate', {'id': profile['id']})
+                self.assertEqual(missing_confirmation.exception.code, 400)
+                cloned = json.loads(req('/api/profiles/duplicate', {'id': profile['id']})[1])
+                self.assertNotEqual(cloned['id'], profile['id'])
+                self.assertEqual(cloned['device'], 'Galaxy S24')
+                self.assertFalse((Path(folder) / 'profiles' / cloned['id']).exists())
+                changed = json.loads(req('/api/profiles/regenerate', {
+                    'id':profile['id'], 'confirmed':True})[1])
+                self.assertEqual(changed['fingerprint']['reason'],
+                                 'user-explicit-regeneration')
+                req('/api/profiles/delete', {'id':cloned['id']})
                 site = json.loads(req('/api/sites/update', {'id':site['id'],'name':'Novo nome', 'url':'https://example.org'})[1])
                 self.assertEqual(site['name'], 'Novo nome')
                 with self.assertRaises(urllib.error.HTTPError) as error:
