@@ -94,9 +94,13 @@ function renderProfiles() {
       actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'stop' : 'start'}" data-id="${profile.id}">${running ? '■ Encerrar' : '▶ Iniciar'}</button>`;
       if (!running && supportsDeviceChoice) actions += `<button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     }
+    if (localhostDeviceMode) {
+      actions += `<button class="btn btn-ghost" data-action="inspect-profile" data-id="${profile.id}">Diagnóstico</button>`;
+      if (!running) actions += `<button class="btn btn-ghost" data-action="duplicate-profile" data-id="${profile.id}">Duplicar</button><button class="btn btn-ghost" data-action="regenerate-profile" data-id="${profile.id}" title="Atualiza o snapshot oficial, não altera hardware real">Recriar preset</button>`;
+    }
     const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
     const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${browserLocalMode ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${supportsDeviceChoice ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
   // Keep thousands of saved profiles manageable without rendering every
   // card on every ten-second status refresh. No profile is discarded.
@@ -129,6 +133,22 @@ function openModal(kind, item) {
   $('#fieldName').focus();
 }
 function closeModal(){ $('#modal').hidden = true; $('#modalForm').reset(); }
+function closeFingerprintInspector(){ $('#fingerprintModal').hidden = true; }
+async function openFingerprintInspector(id) {
+  $('#fingerprintReport').textContent = 'Consultando o navegador local...';
+  $('#fingerprintModal').hidden = false;
+  try {
+    const result = await api('profiles/inspect/' + id);
+    $('#fingerprintReport').textContent = JSON.stringify(result, null, 2);
+  } catch (err) {
+    $('#fingerprintReport').textContent = 'Não foi possível inspecionar: ' + err.message;
+  }
+}
+$('#fingerprintClose').addEventListener('click', closeFingerprintInspector);
+$('#fingerprintDone').addEventListener('click', closeFingerprintInspector);
+$('#fingerprintModal').addEventListener('click', event => {
+  if (event.target.id === 'fingerprintModal') closeFingerprintInspector();
+});
 async function perform(route, payload, successText) {
   if (busy) return;
   busy = true;
@@ -159,6 +179,17 @@ document.addEventListener('click', async event => {
     return;
   }
   const id = btn.dataset.id;
+  if (localhostDeviceMode && action === 'inspect-profile') return openFingerprintInspector(id);
+  if (localhostDeviceMode && action === 'duplicate-profile') {
+    if (confirm('Duplicar SOMENTE a configuração? O novo perfil terá armazenamento vazio, sem cookies nem logins copiados.'))
+      return perform('profiles/duplicate', {id}, 'Novo perfil independente criado.');
+    return;
+  }
+  if (localhostDeviceMode && action === 'regenerate-profile') {
+    if (confirm('Recriar o snapshot oficial do dispositivo? Isso não cria outro hardware nem apaga logins. Feche o navegador antes.'))
+      return perform('profiles/regenerate', {id, confirmed: true}, 'Snapshot do preset atualizado.');
+    return;
+  }
   if (action === 'add-site') return openModal('site');
   if (action === 'add-profile') {
     if (!state.sites.length) { page='sites';render();toast('Cadastre um site antes de criar um perfil.');return openModal('site'); }
