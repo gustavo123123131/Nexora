@@ -297,6 +297,8 @@ class BrowserTests(unittest.TestCase):
                     self.assertIn('Android', report['observed']['userAgent'])
                     self.assertIn('platform', report['observed'])
                     self.assertIn('webdriver', report['observed'])
+                    self.assertTrue(report['user_agent_reference_audit']['available'])
+                    self.assertFalse(report['user_agent_reference_audit']['applied_to_browser'])
                     self.assertIn('webgl', report['observed'])
                     self.assertIn('timezone', report['observed'])
                     self.assertTrue(report['comparisons']['userAgent'])
