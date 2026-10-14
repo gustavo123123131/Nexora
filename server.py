@@ -1,6 +1,7 @@
 """Painel local HTTP; sem serviços externos e sem dependências web."""
 import json
 import os
+import re
 import shutil
 import signal
 import sys
@@ -54,10 +55,22 @@ class Handler(BaseHTTPRequestHandler):
             statuses = self.server.manager.status()
             return self.send_json(200, {
                 'sites': self.server.store.sites,
-                'profiles': [{**profile, 'device': profile.get('device', 'Pixel 7'),
-                              'status': statuses.get(profile['id'], 'stopped')}
-                             for profile in self.server.store.profiles]
+                'profiles': [{
+                    **{k: v for k, v in profile.items() if k != 'fingerprint'},
+                    'device': profile.get('device', 'Pixel 7'),
+                    'fingerprint_version': profile.get('fingerprint', {}).get('version'),
+                    'status': statuses.get(profile['id'], 'stopped')
+                } for profile in self.server.store.profiles]
             })
+        match = re.fullmatch(r'/api/profiles/inspect/([0-9a-f]{32})', route)
+        if match:
+            try:
+                return self.send_json(200, self.server.manager.inspect(match.group(1)))
+            except (ValueError, LookupError) as exc:
+                return self.send_json(400, {'error': str(exc)})
+            except Exception as exc:
+                print(f'[fingerprint-inspect] {type(exc).__name__}', file=sys.stderr)
+                return self.send_json(503, {'error': 'Não foi possível ler o navegador.'})
         files = {'/': ('index.html', 'text/html; charset=utf-8'),
                  '/app.js': ('app.js', 'application/javascript; charset=utf-8'),
                  '/local_store.js': ('local_store.js', 'application/javascript; charset=utf-8'),
@@ -108,6 +121,15 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Encerre o navegador antes de editar o perfil.')
                 data = store.update_profile(profile_id, body.get('name'),
                                             body.get('site_id'), body.get('device'))
+            elif route == '/api/profiles/duplicate':
+                data = store.duplicate_profile(body.get('id'))
+            elif route == '/api/profiles/regenerate':
+                profile_id = body.get('id')
+                if body.get('confirmed') is not True:
+                    raise ValueError('Confirme explicitamente a substituição da configuração.')
+                if manager.is_running(profile_id):
+                    raise ValueError('Encerre o navegador antes de regenerar.')
+                data = store.regenerate_fingerprint(profile_id)
             elif route == '/api/profiles/delete':
                 profile_id = body.get('id')
                 manager.stop(profile_id)
