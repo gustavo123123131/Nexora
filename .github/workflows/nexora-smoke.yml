@@ -52,3 +52,5 @@ jobs:
           python -m playwright install chromium
       - name: Verify actual Windows locale and Chromium HTTP headers
         run: python -m unittest discover -s tests -p test_browser_environment.py -v
+      - name: Verify expanded Playwright device catalog on Windows
+        run: python -m unittest discover -s tests -p test_runner_browser.py -k test_catalog_comes_from_real_playwright_android_descriptors -v
