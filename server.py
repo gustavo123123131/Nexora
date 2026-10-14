@@ -14,6 +14,7 @@ from urllib.parse import unquote, urlsplit
 from storage import Store
 from browser_manager import BrowserManager
 from device_profile_manager import DeviceProfileManager
+from multilogin_controller import MultiLoginController
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / 'public'
@@ -145,6 +146,13 @@ class Handler(BaseHTTPRequestHandler):
                 data = manager.start(body.get('id'))
             elif route == '/api/profiles/stop':
                 data = {'stopped': manager.stop(body.get('id'))}
+            elif route == '/api/sessions/start-selected':
+                data = self.server.multilogin.start_selected(body.get('ids'))
+            elif route == '/api/sessions/stop-selected':
+                data = self.server.multilogin.stop_selected(body.get('ids'))
+            elif route == '/api/windows/arrange-selected':
+                data = self.server.multilogin.arrange_selected(body.get('ids'),
+                    body.get('columns'))
             else:
                 return self.send_json(404, {'error': 'Operação não encontrada.'})
             return self.send_json(200, data)
@@ -164,6 +172,7 @@ class LocalServer(HTTPServer):
         self.store = Store(data_dir)
         self.manager = manager if manager is not None else BrowserManager(self.store)
         self.device_profiles = DeviceProfileManager(self.store, self.manager)
+        self.multilogin = MultiLoginController(self.manager)
 
 
 def open_local_panel(*, prefer_bundled=None):
