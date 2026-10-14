@@ -46,7 +46,7 @@ class MultiLoginController:
 
     def start_selected(self, ids):
         ids = _validated_ids(ids, self.store)
-        started, already_open, failures = [], [], {}
+        started, already_open, failures, warnings = [], [], {}, {}
         for profile_id in ids:
             try:
                 result = self.manager.start(profile_id)
@@ -54,6 +54,10 @@ class MultiLoginController:
                     already_open.append(profile_id)
                 else:
                     started.append(profile_id)
+                if result.get('warning'):
+                    # The launcher uses a fixed generic warning. Never return
+                    # browser URLs or raw exception content in this endpoint.
+                    warnings[profile_id] = 'O navegador abriu, mas a página pode não ter carregado.'
             except Exception as exc:
                 # Do not emit navigation URLs, cookies or exception arguments.
                 failures[profile_id] = type(exc).__name__
@@ -66,6 +70,7 @@ class MultiLoginController:
             'started': started,
             'already_open': already_open,
             'errors': failures,
+            'warnings': warnings,
             'not_attempted': [pid for pid in ids if pid not in processed],
         }
 
