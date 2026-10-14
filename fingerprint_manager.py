@@ -9,6 +9,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from importlib.metadata import version
 from pathlib import Path
+from mobile_ua_catalog import audit_mobile_user_agents
 
 CATALOG = json.loads((Path(__file__).resolve().parent / 'runner' /
                       'device_descriptors.json').read_text(encoding='utf-8'))
@@ -174,6 +175,8 @@ class FingerprintManager:
                            'playwright_version': snapshot['playwright_version'],
                            'descriptor': expected},
             'observed': observed,
+            'user_agent_reference_audit': audit_mobile_user_agents(
+                expected['user_agent'], observed['userAgent']),
             'comparisons': comparisons,
             'runtime_signals': {
                 'automation_exposed': observed['webdriver'] is True,
