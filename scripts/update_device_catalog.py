@@ -21,20 +21,37 @@ def main():
                        and item.get('is_mobile') and item.get('has_touch')
                        and 'Android' in item.get('user_agent', '')
                        and 'Windows Phone' not in item.get('user_agent', ''))
+        valid_keys = ('user_agent', 'viewport', 'screen', 'device_scale_factor',
+                      'is_mobile', 'has_touch', 'default_browser_type')
+        descriptors = {
+            name: {key: playwright.devices[name][key] for key in valid_keys
+                   if key in playwright.devices[name]}
+            for name in names
+        }
     if 'Pixel 7' not in names or len(names) < 20:
         raise RuntimeError('A lista de dispositivos foi alterada inesperadamente.')
+    current_version = version('playwright')
     manifest = {
         'schema_version': 1,
-        'source': ('microsoft/playwright v' + version('playwright') +
+        'source': ('microsoft/playwright v' + current_version +
                    ' packages/playwright-core/src/server/deviceDescriptorsSource.json'),
         'default_device': 'Pixel 7',
         'devices': names,
     }
-    contents = json.dumps(manifest, indent=2, ensure_ascii=False) + '\n'
+    snapshots = {
+        'schema_version': 1,
+        'source': ('microsoft/playwright v' + current_version +
+                   ' deviceDescriptorsSource.json'),
+        'playwright_version': current_version,
+        'devices': descriptors,
+    }
     for filename in ('runner/device_catalog.json', 'public/device_catalog.json'):
-        (ROOT / filename).write_text(contents, encoding='utf-8')
+        (ROOT / filename).write_text(json.dumps(manifest, indent=2, ensure_ascii=False)
+                                     + '\\n', encoding='utf-8')
+    (ROOT / 'runner/device_descriptors.json').write_text(
+        json.dumps(snapshots, indent=2, ensure_ascii=False) + '\\n', encoding='utf-8')
     print('Presets Chromium Android:', len(names))
-    print('Atualizados: runner/device_catalog.json, public/device_catalog.json')
+    print('Atualizados: catálogo do painel, executor e descritores versionados')
 
 if __name__ == '__main__':
     main()
