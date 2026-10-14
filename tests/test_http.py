@@ -90,6 +90,15 @@ class HttpTests(unittest.TestCase):
                 self.assertNotEqual(cloned['id'], profile['id'])
                 self.assertEqual(cloned['device'], 'Galaxy S24')
                 self.assertFalse((Path(folder) / 'profiles' / cloned['id']).exists())
+                exported = json.loads(req('/api/profiles/export/' + profile['id'])[1])
+                self.assertEqual(exported['fingerprint']['preset'], 'Galaxy S24')
+                self.assertNotIn('cookies', json.dumps(exported).lower())
+                imported = json.loads(req('/api/profiles/import-config', {
+                    'configuration': exported})[1])
+                self.assertNotEqual(imported['id'], profile['id'])
+                self.assertEqual(imported['device'], 'Galaxy S24')
+                self.assertFalse((Path(folder) / 'profiles' / imported['id']).exists())
+                req('/api/profiles/delete', {'id':imported['id']})
                 changed = json.loads(req('/api/profiles/regenerate', {
                     'id':profile['id'], 'confirmed':True})[1])
                 self.assertEqual(changed['fingerprint']['reason'],
