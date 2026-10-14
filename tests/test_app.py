@@ -132,6 +132,63 @@ class RuntimeSessionStateTests(unittest.TestCase):
         self.assertEqual(details['last_error_type'], 'ValueError')
         self.assertNotIn('private url', str(details))
 
+class LocalPanelLaunchTests(unittest.TestCase):
+    def test_panel_prefers_bundled_chromium_without_sharing_profile_storage(self):
+        import sys
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import server
+
+        class PlaywrightStub:
+            def __enter__(self):
+                return SimpleNamespace(
+                    chromium=SimpleNamespace(executable_path=sys.executable))
+            def __exit__(self, *_):
+                return False
+
+        with tempfile.TemporaryDirectory() as root:
+            with (patch('server.DATA', Path(root)),
+                  patch('playwright.sync_api.sync_playwright',
+                        return_value=PlaywrightStub()),
+                  patch('server.subprocess.Popen') as launch,
+                  patch('server.webbrowser.open') as default_browser):
+                server.open_local_panel(prefer_bundled=True)
+                default_browser.assert_not_called()
+                launch.assert_called_once()
+                args = launch.call_args.args[0]
+                self.assertEqual(args[0], sys.executable)
+                self.assertIn('--new-window', args)
+                self.assertTrue(any(arg.startswith('--user-data-dir=')
+                                    and 'panel-chromium' in arg for arg in args))
+                self.assertIn('http://127.0.0.1:3000', args)
+                self.assertTrue((Path(root) / 'panel-chromium').is_dir())
+                self.assertFalse((Path(root) / 'profiles').exists())
+
+    def test_panel_falls_back_when_bundled_browser_missing(self):
+        from pathlib import Path
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import server
+
+        class PlaywrightStub:
+            def __enter__(self):
+                return SimpleNamespace(
+                    chromium=SimpleNamespace(executable_path='/not-found/chromium'))
+            def __exit__(self, *_):
+                return False
+
+        with tempfile.TemporaryDirectory() as root:
+            with (patch('server.DATA', Path(root)),
+                  patch('playwright.sync_api.sync_playwright',
+                        return_value=PlaywrightStub()),
+                  patch('server.subprocess.Popen') as launch,
+                  patch('server.webbrowser.open') as default_browser):
+                server.open_local_panel(prefer_bundled=True)
+                launch.assert_not_called()
+                default_browser.assert_called_once()
+
+
 class BrowserTests(unittest.TestCase):
     def test_mobile_cookie_isolation_and_persistence(self):
         fixture = ThreadingHTTPServer(('127.0.0.1', 0), WebFixture)
