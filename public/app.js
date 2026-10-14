@@ -8,8 +8,6 @@ let toastTimer = null;
 let visibleProfileCount = 150; // Bound DOM cost; not a limit on saved profile records.
 let cloudMode = false;
 let browserAvailable = true;
-let manualChromeMode = false;
-let androidRealMode = false;
 // Vercel defaults to passwordless browser-local metadata. Add ?storage=cloud to
 // deliberately opt into the legacy authenticated PostgreSQL deployment.
 const localhostDeviceMode = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
@@ -42,8 +40,6 @@ async function refresh() {
     state = await api('state');
     cloudMode = state.capabilities?.mode === 'vercel';
     browserAvailable = state.capabilities?.browser !== false;
-    manualChromeMode = localhostDeviceMode && state.capabilities?.mode === 'chrome-manual';
-    androidRealMode = localhostDeviceMode && state.capabilities?.mode === 'android-real';
     updateEnvironment();
     render();
   } catch (err) {
@@ -66,7 +62,7 @@ function render() {
   $('#pageTitle').textContent = page === 'profiles' ? 'Seus perfis' : 'Sites cadastrados';
   $('#breadcrumbCurrent').textContent = page === 'profiles' ? 'Perfis' : 'Sites';
   $('#pageDescription').textContent = page === 'profiles'
-    ? (androidRealMode ? 'Android conectado por USB: navegue no aparelho, usando a janela de espelhamento no PC. Cada aparelho aceita uma sessão por vez.' : (manualChromeMode ? 'Chrome normal com perfis locais separados e navegação manual. Não utiliza emulação Android nem automação.' : (browserAvailable ? 'Gerencie navegadores independentes com experiência mobile Android.' : 'Cadastre e organize perfis na nuvem. Navegadores externos ainda não estão conectados.')))
+    ? (browserAvailable ? 'Gerencie navegadores independentes com experiência mobile Android.' : 'Cadastre e organize perfis na nuvem. Navegadores externos ainda não estão conectados.')
     : 'Configure os endereços que serão abertos nos perfis.';
   $('#primaryAction').innerHTML = '<span class="plus">+</span> ' + (page === 'profiles' ? 'Criar perfil' : 'Adicionar site');
   renderProfiles();
@@ -94,24 +90,17 @@ function renderProfiles() {
       if (!running) actions += `<button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     } else if (unavailable) {
       actions = '<button class="btn btn-secondary" disabled>Navegador indisponível</button>';
-    } else if (androidRealMode) {
-      actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'stop' : 'android-start'}" data-id="${profile.id}">${running ? '■ Fechar espelho' : '▶ Abrir no Android'}</button>`;
-      if (!running) actions += `<button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
-    } else if (manualChromeMode) {
-      actions = running
-        ? '<button class="btn btn-secondary" disabled>Feche a janela do Chrome para encerrar</button>'
-        : `<button class="btn btn-primary" data-action="start" data-id="${profile.id}">▶ Abrir Chrome manual</button><button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     } else {
       actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'stop' : 'start'}" data-id="${profile.id}">${running ? '■ Encerrar' : '▶ Iniciar'}</button>`;
       if (!running && supportsDeviceChoice) actions += `<button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     }
     if (localhostDeviceMode) {
       actions += `<button class="btn btn-ghost" data-action="inspect-profile" data-id="${profile.id}">Diagnóstico</button>`;
-      if (!running) actions += `<button class="btn btn-ghost" data-action="duplicate-profile" data-id="${profile.id}">Duplicar</button>${androidRealMode ? '' : `<button class="btn btn-ghost" data-action="regenerate-profile" data-id="${profile.id}" title="Atualiza o snapshot oficial, não altera hardware real">Recriar preset</button>`}`;
+      if (!running) actions += `<button class="btn btn-ghost" data-action="duplicate-profile" data-id="${profile.id}">Duplicar</button><button class="btn btn-ghost" data-action="regenerate-profile" data-id="${profile.id}" title="Atualiza o snapshot oficial, não altera hardware real">Recriar preset</button>`;
     }
     const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
     const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${supportsDeviceChoice ? ' · ' + (androidRealMode ? 'Android conectado' : (manualChromeMode ? 'Chrome desktop normal' : escapeHTML(profile.device || 'Pixel 7'))) : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${supportsDeviceChoice ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
   // Keep thousands of saved profiles manageable without rendering every
   // card on every ten-second status refresh. No profile is discarded.
@@ -138,7 +127,7 @@ function openModal(kind, item) {
   $('#modalSubmit').textContent = item ? 'Salvar alterações' : (isSite ? 'Adicionar site' : 'Criar perfil');
   $('#modalFields').innerHTML = isSite
     ? `<div class="field"><label for="fieldName">Nome do site</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Site principal" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldUrl">Endereço (URL)</label><input id="fieldUrl" name="url" type="url" maxlength="2048" placeholder="https://exemplo.com" required value="${escapeHTML(item?.url || '')}"><div class="field-note">Use http:// ou https:// no endereço.</div></div>`
-    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}" ${item?.site_id === site.id ? 'selected' : ''}>${escapeHTML(site.name)}</option>`).join('')}</select></div>${supportsDeviceChoice ? `<div class="field"><label for="fieldDevice">${(manualChromeMode || androidRealMode) ? 'Preset salvo (somente para o modo Playwright)' : 'Modelo de celular (emulação Chromium)'}</label><select id="fieldDevice" name="device" required>${globalThis.NexoraBrowserStore.devices.map(device => `<option value="${escapeHTML(device)}" ${(item?.device || 'Pixel 7') === device ? 'selected' : ''}>${escapeHTML(device)}</option>`).join('')}</select><div class="field-note">Modelo salvo individualmente. Não é Android real.</div></div>` : ''}`;
+    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}" ${item?.site_id === site.id ? 'selected' : ''}>${escapeHTML(site.name)}</option>`).join('')}</select></div>${supportsDeviceChoice ? `<div class="field"><label for="fieldDevice">Modelo de celular (emulação Chromium)</label><select id="fieldDevice" name="device" required>${globalThis.NexoraBrowserStore.devices.map(device => `<option value="${escapeHTML(device)}" ${(item?.device || 'Pixel 7') === device ? 'selected' : ''}>${escapeHTML(device)}</option>`).join('')}</select><div class="field-note">Modelo salvo individualmente. Não é Android real.</div></div>` : ''}`;
   $('#modalForm').dataset.kind = kind;
   $('#modalForm').dataset.id = item?.id || '';
   $('#fieldName').focus();
@@ -231,25 +220,8 @@ document.addEventListener('click', async event => {
   }
   if (action === 'remote-stop') return globalThis.NexoraRemote.stop(id);
   if (action === 'remote-view') return globalThis.NexoraRemote.view(id);
-  if (action === 'android-start') {
-    try {
-      const result = await api('android/devices');
-      const devices = (result.devices || []).filter(d => d.available);
-      if (!devices.length) return toast('Nenhum Android autorizado: conecte USB e aceite a depuração no celular.', true);
-      let serial = devices[0].serial;
-      if (devices.length > 1) {
-        const chosen = prompt('Qual Android deseja usar? Cole o identificador de um aparelho conectado:\\n' + devices.map(d => d.serial).join('\\n'), serial);
-        if (chosen === null) return;
-        serial = chosen.trim();
-        if (!devices.some(d => d.serial === serial)) return toast('Selecione um Android da lista.', true);
-      }
-      return perform('profiles/start', {id, serial}, 'Janela do Android aberta. Navegue no celular espelhado.');
-    } catch (err) {
-      return toast('Não foi possível listar Androids: ' + err.message, true);
-    }
-  }
   if (action === 'start') return perform('profiles/start', {id}, 'Navegador iniciado. Faça login manualmente na janela aberta.');
-  if (action === 'stop') return perform('profiles/stop', {id}, androidRealMode ? 'Espelhamento encerrado. O navegador do celular permanece aberto.' : 'Perfil encerrado. Sessão salva.');
+  if (action === 'stop') return perform('profiles/stop', {id}, 'Perfil encerrado. Sessão salva.');
   if (action === 'delete-profile') {
     const profile = state.profiles.find(p => p.id === id);
     if (browserLocalMode && globalThis.NexoraRemote?.isRunning(id)) return toast('Encerre o navegador remoto deste perfil antes de excluir o cadastro.', true);
@@ -291,10 +263,10 @@ function updateEnvironment() {
     $('#runnerButton').textContent = globalThis.NexoraRemote?.connected ? '◉ Navegador conectado' : 'Conectar navegador';
   }
   $('#importButton').hidden = !cloudMode;
-  $('#runtimeStatus').textContent = androidRealMode ? 'Android conectado · localhost' : (manualChromeMode ? 'Chrome manual · localhost' : (browserLocalMode ? 'Cadastros neste navegador' : (cloudMode ? 'Painel hospedado na Vercel' : 'Executando localmente')));
+  $('#runtimeStatus').textContent = browserLocalMode ? 'Cadastros neste navegador' : (cloudMode ? 'Painel hospedado na Vercel' : 'Executando localmente');
   $('#connectionLabel').textContent = browserLocalMode ? 'Modo sem senha' : (cloudMode ? 'Nuvem conectada' : 'Conexão local');
-  $('#versionLabel').textContent = androidRealMode ? 'Nexora · Android conectado' : (manualChromeMode ? 'Nexora · Chrome manual' : (browserLocalMode ? 'Nexora · Vercel / dados locais' : (cloudMode ? 'Nexora · Vercel' : 'Nexora · modo local')));
-  $('#profileHelper').textContent = androidRealMode ? 'Uma sessão por Android conectado' : (browserAvailable ? 'Dados isolados por perfil' : 'Executor não conectado');
+  $('#versionLabel').textContent = browserLocalMode ? 'Nexora · Vercel / dados locais' : (cloudMode ? 'Nexora · Vercel' : 'Nexora · modo local');
+  $('#profileHelper').textContent = browserAvailable ? 'Dados isolados por perfil' : 'Executor não conectado';
   $('#cloudNotice p').textContent = browserLocalMode
     ? (globalThis.NexoraRemote?.connected
       ? (globalThis.NexoraRemote.desktop
@@ -302,8 +274,8 @@ function updateEnvironment() {
         : 'Executor Chromium conectado: cada perfil tem uma sessão real separada. Os logins são guardados no volume persistente do executor, não na Vercel. O modo mobile é emulado.')
       : 'Perfis cadastrados neste navegador. Para fazer multi-login de verdade, conecte o executor Chromium remoto. A Vercel sozinha não mantém sessões independentes.')
     : 'Perfis e sites ficam no banco remoto, mas o navegador persistente exige um executor dedicado. A Vercel sozinha não abre sessões independentes.';
-  $('.device-tile strong').textContent = androidRealMode ? 'Android conectado' : (manualChromeMode ? 'Chrome desktop' : (browserAvailable ? 'Android Mobile' : 'Executor remoto'));
-  $('.device-tile span:last-child').textContent = androidRealMode ? 'Navegação no aparelho · scrcpy' : (manualChromeMode ? 'Sem automação · perfis separados' : (browserAvailable ? 'Modelos Android · Chromium' : 'Não conectado'));
+  $('.device-tile strong').textContent = browserAvailable ? 'Android Mobile' : 'Executor remoto';
+  $('.device-tile span:last-child').textContent = browserAvailable ? 'Modelos Android · Chromium' : 'Não conectado';
 }
 function showLogin(error='') {
   $('#mainShell').hidden = true;

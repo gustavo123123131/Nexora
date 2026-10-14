@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Check Python source without running browsers
-        run: python -m compileall -q app.py cloud_store.py storage.py server.py browser_manager.py manual_browser_manager.py android_device_manager.py fingerprint_manager.py device_profile_manager.py session_manager.py scripts/update_device_catalog.py runner/worker.py runner/start_windows.py
+        run: python -m compileall -q app.py cloud_store.py storage.py server.py browser_manager.py fingerprint_manager.py device_profile_manager.py session_manager.py scripts/update_device_catalog.py runner/worker.py runner/start_windows.py
       - name: Check browser UI JavaScript syntax
         run: node --check public/app.js && node --check public/local_store.js && node --check public/remote_browser.js
       - name: Check metadata storage and JavaScript
@@ -38,10 +38,6 @@ jobs:
         run: python -m unittest discover -s tests -p test_browser_environment.py -v
       - name: Localhost CRUD and multi-device browser integration
         run: python -m unittest discover -s tests -p test_http.py -v && python -m unittest discover -s tests -p test_app.py -v
-      - name: Manual Chrome backend isolation and localhost selection
-        run: python -m unittest discover -s tests -p test_manual_chrome.py -v
-      - name: Android connected backend simulation and localhost integration
-        run: python -m unittest discover -s tests -p test_android_device.py -v
       - name: Real browser profile isolation and persistence
         run: python -m unittest discover -s tests -p test_runner_browser.py -v
       - name: Headed Chromium windows in a virtual desktop (Xvfb)

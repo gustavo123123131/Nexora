@@ -3,7 +3,6 @@ import json
 import os
 import re
 import signal
-import subprocess
 import sys
 import threading
 import webbrowser
@@ -13,8 +12,6 @@ from urllib.parse import unquote, urlsplit
 
 from storage import Store
 from browser_manager import BrowserManager
-from manual_browser_manager import ManualChromeManager
-from android_device_manager import AndroidDeviceManager
 from device_profile_manager import DeviceProfileManager
 
 ROOT = Path(__file__).resolve().parent
@@ -58,7 +55,6 @@ class Handler(BaseHTTPRequestHandler):
             statuses = self.server.manager.status()
             return self.send_json(200, {
                 'sites': self.server.store.sites,
-                'capabilities': {'browser': True, 'mode': self.server.manager.mode if hasattr(self.server.manager, 'mode') else 'playwright'},
                 'profiles': [{
                     **{k: v for k, v in profile.items() if k != 'fingerprint'},
                     'device': profile.get('device', 'Pixel 7'),
@@ -66,13 +62,6 @@ class Handler(BaseHTTPRequestHandler):
                     'status': statuses.get(profile['id'], 'stopped')
                 } for profile in self.server.store.profiles]
             })
-        if route == '/api/android/devices' and getattr(self.server.manager, 'mode', None) == 'android-real':
-            try:
-                return self.send_json(200, {'devices': self.server.manager.list_devices()})
-            except (FileNotFoundError, OSError) as exc:
-                return self.send_json(503, {'error': str(exc)})
-            except Exception:
-                return self.send_json(503, {'error': 'Falha ao consultar dispositivos Android.'})
         if route == '/api/sessions':
             return self.send_json(200, {
                 'sessions': self.server.manager.session_details(),
@@ -152,10 +141,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.device_profiles.delete(body.get('id'))
                 data = {'ok': True}
             elif route == '/api/profiles/start':
-                if getattr(manager, 'mode', None) == 'android-real':
-                    data = manager.start(body.get('id'), body.get('serial'))
-                else:
-                    data = manager.start(body.get('id'))
+                data = manager.start(body.get('id'))
             elif route == '/api/profiles/stop':
                 data = {'stopped': manager.stop(body.get('id'))}
             else:
@@ -163,11 +149,6 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, data)
         except (ValueError, LookupError, TypeError) as ex:
             return self.send_json(400, {'error': str(ex)})
-        except FileNotFoundError as ex:
-            return self.send_json(503, {'error': str(ex)})
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            return self.send_json(503, {'error': 'Falha ao comunicar com Android. '
-                                              'Confira cabo USB, autorização e adb/scrcpy.'})
         except Exception as ex:
             # Não mostra stack traces, caminhos internos ou credenciais no navegador.
             print(f'[erro interno] {type(ex).__name__}: {ex}', file=sys.stderr)
@@ -180,21 +161,14 @@ class LocalServer(HTTPServer):
     def __init__(self, port=PORT, data_dir=DATA, manager=None):
         super().__init__(('127.0.0.1', port), Handler)
         self.store = Store(data_dir)
-        if manager is not None:
-            self.manager = manager
-        elif os.environ.get('MULTILOGIN_BROWSER_MODE') == 'chrome-manual':
-            self.manager = ManualChromeManager(self.store)
-        elif os.environ.get('MULTILOGIN_BROWSER_MODE') == 'android-real':
-            self.manager = AndroidDeviceManager(self.store)
-        else:
-            self.manager = BrowserManager(self.store)
+        self.manager = manager if manager is not None else BrowserManager(self.store)
         self.device_profiles = DeviceProfileManager(self.store, self.manager)
 
 
 def main():
     server = LocalServer()
     print('\n' + '=' * 52)
-    print(' MULTILOGIN  |  Android conectado' if getattr(server.manager, 'mode', None) == 'android-real' else (' MULTILOGIN  |  Chrome manual' if getattr(server.manager, 'mode', None) == 'chrome-manual' else ' MULTILOGIN MOBILE  |  Painel local'))
+    print(' MULTILOGIN MOBILE  |  Painel local')
     print(f' Acesse: http://127.0.0.1:{PORT}')
     print(' Use Ctrl+C para encerrar e fechar os perfis.')
     print('=' * 52 + '\n', flush=True)
