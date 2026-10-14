@@ -56,3 +56,18 @@
 
 .remote-show { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #d0d8e6; white-space: nowrap; }
 .remote-show input { width: auto; min-width: 0; flex: none; }
+
+/* Read-only inspector. Keep all existing panel layouts untouched. */
+.fingerprint-report {
+  max-height: 55vh;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--border, #30343e);
+  border-radius: 9px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  text-align: left;
+}
