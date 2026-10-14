@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Check Python source without running browsers
-        run: python -m compileall -q app.py cloud_store.py storage.py server.py browser_manager.py fingerprint_manager.py scripts/update_device_catalog.py runner/worker.py runner/start_windows.py
+        run: python -m compileall -q app.py cloud_store.py storage.py server.py browser_manager.py fingerprint_manager.py session_manager.py scripts/update_device_catalog.py runner/worker.py runner/start_windows.py
       - name: Check metadata storage and JavaScript
         run: node --test tests/test_browser_store.cjs tests/test_remote_cloudflare.cjs
   chromium:
