@@ -5,6 +5,20 @@ from pathlib import Path
 from uuid import uuid4
 from urllib.parse import urlsplit
 
+# Match the signed-off Playwright device catalog used by the Windows runner.
+_CATALOG_PATH = Path(__file__).resolve().parent / 'runner' / 'device_catalog.json'
+_DEVICE_CATALOG = json.loads(_CATALOG_PATH.read_text(encoding='utf-8'))
+DEVICE_MODELS = frozenset(_DEVICE_CATALOG['devices'])
+DEFAULT_DEVICE = _DEVICE_CATALOG['default_device']
+
+
+def validate_device(value):
+    if value is None:
+        return DEFAULT_DEVICE
+    if not isinstance(value, str) or value not in DEVICE_MODELS:
+        raise ValueError('Selecione um modelo de dispositivo válido.')
+    return value
+
 
 def validate_url(value):
     if not isinstance(value, str) or len(value) > 2048:
@@ -85,11 +99,24 @@ class Store:
         self.sites = [s for s in self.sites if s['id'] != site_id]
         self.save()
 
-    def create_profile(self, name, site_id):
+    def create_profile(self, name, site_id, device=None):
         if not self.site(site_id):
             raise ValueError('Selecione um site cadastrado.')
-        item = {'id': uuid4().hex, 'name': validate_name(name, 'nome do perfil'), 'site_id': site_id}
+        item = {'id': uuid4().hex, 'name': validate_name(name, 'nome do perfil'),
+                'site_id': site_id, 'device': validate_device(device)}
         self.profiles.append(item)
+        self.save()
+        return item
+
+    def update_profile(self, profile_id, name, site_id, device=None):
+        item = self.profile(profile_id)
+        if item is None:
+            raise LookupError('Perfil não encontrado.')
+        if not self.site(site_id):
+            raise ValueError('Selecione um site cadastrado.')
+        new_name = validate_name(name, 'nome do perfil')
+        new_device = validate_device(device)
+        item.update(name=new_name, site_id=site_id, device=new_device)
         self.save()
         return item
 
