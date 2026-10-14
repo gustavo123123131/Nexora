@@ -8,6 +8,7 @@ let toastTimer = null;
 let visibleProfileCount = 150; // Bound DOM cost; not a limit on saved profile records.
 let cloudMode = false;
 let browserAvailable = true;
+const selectedProfiles = new Set();
 // Vercel defaults to passwordless browser-local metadata. Add ?storage=cloud to
 // deliberately opt into the legacy authenticated PostgreSQL deployment.
 const localhostDeviceMode = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
@@ -61,6 +62,9 @@ function render() {
   $('#siteContent').hidden = page !== 'sites';
   $('#pageTitle').textContent = page === 'profiles' ? 'Seus perfis' : 'Sites cadastrados';
   $('#breadcrumbCurrent').textContent = page === 'profiles' ? 'Perfis' : 'Sites';
+  for (const id of selectedProfiles) if (!state.profiles.some(p => p.id === id)) selectedProfiles.delete(id);
+  $('#bulkActions').hidden = !localhostDeviceMode || page !== 'profiles' || !state.profiles.length;
+  $('#bulkSelectedCount').textContent = selectedProfiles.size + ' selecionados (máx. 12)';
   $('#pageDescription').textContent = page === 'profiles'
     ? (browserAvailable ? 'Gerencie navegadores independentes com experiência mobile Android.' : 'Cadastre e organize perfis na nuvem. Navegadores externos ainda não estão conectados.')
     : 'Configure os endereços que serão abertos nos perfis.';
@@ -100,7 +104,7 @@ function renderProfiles() {
     }
     const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
     const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
-    return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${supportsDeviceChoice ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
+    return `<article class="profile-card">${localhostDeviceMode ? `<label class="profile-select"><input type="checkbox" data-profile-id="${profile.id}" aria-label="Selecionar ${escapeHTML(profile.name)}" ${selectedProfiles.has(profile.id) ? 'checked' : ''}><span>Selecionar</span></label>` : ''}<div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${supportsDeviceChoice ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
   // Keep thousands of saved profiles manageable without rendering every
   // card on every ten-second status refresh. No profile is discarded.
@@ -167,6 +171,47 @@ async function perform(route, payload, successText) {
     document.querySelectorAll('button[data-action], #modalSubmit').forEach(b => b.disabled = false);
   }
 }
+document.addEventListener('change', event => {
+  const input = event.target.closest('input[data-profile-id]');
+  if (!input || !localhostDeviceMode) return;
+  const id = input.dataset.profileId;
+  if (input.checked && selectedProfiles.size >= 12) {
+    input.checked = false;
+    return toast('Selecione no máximo 12 perfis por operação.', true);
+  }
+  if (input.checked) selectedProfiles.add(id);
+  else selectedProfiles.delete(id);
+  $('#bulkSelectedCount').textContent = selectedProfiles.size + ' selecionados (máx. 12)';
+});
+
+document.addEventListener('click', async event => {
+  const control = event.target.closest('[data-bulk-action]');
+  if (!control || !localhostDeviceMode || busy) return;
+  const ids = [...selectedProfiles];
+  if (!ids.length) return toast('Selecione ao menos um perfil.', true);
+  const action = control.dataset.bulkAction;
+  if (action === 'stop' && !confirm('Encerrar todos os perfis selecionados? Seus cookies serão salvos normalmente.')) return;
+  const route = {
+    start: 'sessions/start-selected',
+    stop: 'sessions/stop-selected',
+    arrange: 'windows/arrange-selected'
+  }[action];
+  if (!route) return;
+  busy = true;
+  try {
+    const result = await api(route, {ids});
+    const count = (result.started || result.stopped || result.arranged || []).length;
+    const failures = Object.keys(result.errors || {}).length;
+    const pending = (result.not_attempted || []).length;
+    await refresh();
+    toast(count + ' perfis processados.' + (failures || pending
+      ? ' ' + failures + ' erros e ' + pending + ' não iniciados. Verifique sessões e janela do terminal.' : ''),
+      failures > 0 || pending > 0);
+  } catch (error) {
+    toast('Operação de multilogin: ' + error.message, true);
+  } finally { busy = false; }
+});
+
 document.addEventListener('click', async event => {
   const nav = event.target.closest('[data-page]');
   if (nav) {page=nav.dataset.page;render();return;}
