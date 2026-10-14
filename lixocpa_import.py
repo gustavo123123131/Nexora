@@ -58,14 +58,14 @@ def import_legacy_mobile_settings(store, configuration, device=None):
     created_sites, created_profiles = [], []
     try:
         for site_url in plan['urls']:
+            host = urlsplit(site_url).hostname or 'Site'
             site = next((item for item in store.sites if item['url'] == site_url), None)
             if site is None:
-                host = urlsplit(site_url).hostname or 'Site'
                 label = ('LIXOCPA - ' + host)[:80]
                 site = store.create_site(label, site_url)
                 created_sites.append(site['id'])
             for number in range(1, plan['count_per_url'] + 1):
-                name = f"LIXOCPA {host if site_url in plan['urls'] else 'mobile'} #{number:02}"
+                name = f"LIXOCPA {host} #{number:02}"
                 # Existing records retain their IDs. A new imported instance
                 # always receives a fresh Chrome directory and snapshot.
                 created = store.create_profile(name[:80], site['id'], plan['device'])
