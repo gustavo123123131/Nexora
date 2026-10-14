@@ -54,9 +54,13 @@ class AndroidDeviceManager:
             parts = line.split()
             if (len(parts) >= 2 and SERIAL_RE.fullmatch(parts[0])
                     and parts[1] in ('device', 'unauthorized', 'offline')):
+                # ADB's well-known emulator serial is not a physical phone.
+                # This is a preliminary check, not hardware attestation.
+                emulator = parts[0].startswith('emulator-')
                 devices.append({
                     'serial': parts[0], 'state': parts[1],
-                    'available': parts[1] == 'device',
+                    'emulator': emulator,
+                    'available': parts[1] == 'device' and not emulator,
                 })
         return devices
 
@@ -83,7 +87,7 @@ class AndroidDeviceManager:
         active_devices = [d['serial'] for d in self.list_devices()
                           if d['available']]
         if not active_devices:
-            raise ValueError('Nenhum Android autorizado encontrado. '
+            raise ValueError('Nenhum Android físico autorizado encontrado. '
                              'Conecte o aparelho e aceite a depuração USB.')
         if serial is not None and (not isinstance(serial, str)
                                    or not SERIAL_RE.fullmatch(serial)):
