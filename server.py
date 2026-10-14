@@ -62,6 +62,11 @@ class Handler(BaseHTTPRequestHandler):
                     'status': statuses.get(profile['id'], 'stopped')
                 } for profile in self.server.store.profiles]
             })
+        if route == '/api/sessions':
+            return self.send_json(200, {
+                'sessions': self.server.manager.session_details(),
+                'max_simultaneous': self.server.manager.sessions.max_open
+            })
         match = re.fullmatch(r'/api/profiles/inspect/([0-9a-f]{32})', route)
         if match:
             try:
