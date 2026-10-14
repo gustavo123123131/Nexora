@@ -11,6 +11,7 @@ const source = fs.readFileSync(path.join(root, 'public', 'local_store.js'), 'utf
 const frontend = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
 const remote = fs.readFileSync(path.join(root, 'public', 'remote_browser.js'), 'utf8');
 const page = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+const deviceCatalog = JSON.parse(fs.readFileSync(path.join(root, 'public', 'device_catalog.json'), 'utf8'));
 const memory = new Map();
 let counter = 0;
 
@@ -128,4 +129,40 @@ test('legacy profiles and imports default to Pixel 7 without losing IDs or recor
   assert.equal(imported.perfis_importados,1);
   assert.equal(browserStore().request('state').profiles.find(p => p.id === 'e'.repeat(32)).device,
                'Pixel 7');
+});
+
+test('the expanded official catalog is accepted and persists per profile', () => {
+  memory.clear();
+  const store = browserStore();
+  store.configureDevices(deviceCatalog);
+  assert.equal(store.devices.length, 50);
+  assert.ok(store.devices.includes('Galaxy S24'));
+  assert.ok(store.devices.includes('Galaxy A55'));
+  assert.ok(store.devices.includes('Galaxy Tab S9'));
+  const site = store.request('sites/create', {name:'Catalog',url:'https://example.org'});
+  const profile = store.request('profiles/create', {
+    name:'Android profile',site_id:site.id,device:'Galaxy S24'
+  });
+  assert.equal(browserStore().request('state').profiles[0].device, 'Galaxy S24');
+  assert.equal(profile.device,'Galaxy S24');
+  assert.throws(() => store.request('profiles/create',{
+    name:'Invalid',site_id:site.id,device:'Unlisted Model'
+  }), /dispositivo válido/);
+});
+
+test('many registrations remain saved across panel reloads', () => {
+  memory.clear();
+  const store = browserStore();
+  const site = store.request('sites/create', {name:'Site',url:'https://example.org'});
+  for (let i = 0; i < 200; i++) {
+    store.request('profiles/create', {name:'Conta '+i,site_id:site.id,
+      device: i % 2 ? 'Pixel 7' : 'Galaxy S5'});
+  }
+  const profiles = browserStore().request('state').profiles;
+  assert.equal(profiles.length, 200);
+  assert.equal(profiles[0].name,'Conta 0');
+  assert.equal(profiles[199].name,'Conta 199');
+  assert.equal(profiles[0].device,'Galaxy S5');
+  assert.equal(profiles[199].device,'Pixel 7');
+  assert.ok(memory.get('nexora.site-profiles.v1').length < 1_000_000);
 });
