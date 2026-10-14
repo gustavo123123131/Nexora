@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const remoteCode = fs.readFileSync(path.join(__dirname, '..', 'public', 'remote_browser.js'), 'utf8');
 
-function createSandbox(prompts, {desktop = false} = {}) {
+function createSandbox(prompts, {desktop = false, profiles = [], activeIds = []} = {}) {
   const records = [];
   const alerts = [];
   const store = new Map();
@@ -32,11 +32,12 @@ function createSandbox(prompts, {desktop = false} = {}) {
       return {
         ok:true,
         status:200,
-        json: async () => target.endsWith('/v1/start') ? {running: true, desktop} : {ok:true,browser:true,desktop},
+        json: async () => target.endsWith('/v1/start') ? {running: true, desktop} :
+          target.endsWith('/v1/statuses') ? {running_ids: activeIds} : {ok:true,browser:true,desktop},
         blob: async () => new Blob([])
       };
     },
-    NexoraGetProfiles: () => [],
+    NexoraGetProfiles: () => profiles,
     NexoraUIRemoteConnection() {}
   };
   vm.runInNewContext(remoteCode, sandbox, {filename:'remote_browser.js'});
@@ -114,4 +115,17 @@ test('forwards selected device model for each independent profile', async () => 
   assert.equal(JSON.parse(starts[1].options.body).device, 'Galaxy S9+');
   assert.notEqual(JSON.parse(starts[0].options.body).id, JSON.parse(starts[1].options.body).id);
   assert.ok(!scene.records.some(record => record.target.includes('/v1/frame/')));
+});
+
+test('bulk status checks do not make a request per saved profile', async () => {
+  const profiles = Array.from({length:600}, (_,i) => ({id: i.toString(16).padStart(32,'0')}));
+  const scene = createSandbox(['https://example-random.trycloudflare.com','a'.repeat(48)], {
+    desktop:true, profiles, activeIds:[profiles[0].id,profiles[590].id]
+  });
+  await scene.remote.connect();
+  assert.equal(scene.remote.isRunning(profiles[0].id),true);
+  assert.equal(scene.remote.isRunning(profiles[590].id),true);
+  assert.equal(scene.remote.isRunning(profiles[1].id),false);
+  assert.equal(scene.records.filter(record=>record.target.endsWith('/v1/statuses')).length,1);
+  assert.equal(scene.records.filter(record=>record.target.includes('/v1/status/')).length,0);
 });
