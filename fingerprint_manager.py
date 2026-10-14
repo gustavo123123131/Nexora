@@ -127,6 +127,7 @@ class FingerprintManager:
         comparisons = {
             'userAgent': observed['userAgent'] == expected['user_agent'],
             'viewportWidth': observed['viewport']['width'] == expected['viewport']['width'],
+            'viewportHeight': observed['viewport']['height'] == expected['viewport']['height'],
             'devicePixelRatio': abs(observed['devicePixelRatio'] - expected['device_scale_factor']) < 0.01,
             'touch': observed['maxTouchPoints'] > 0 if expected['has_touch'] else observed['maxTouchPoints'] == 0,
         }
@@ -134,23 +135,55 @@ class FingerprintManager:
             comparisons['screen'] = observed['screen'] == expected['screen']
         if locale:
             comparisons['language'] = observed['language'].lower() == locale.lower()
+
+        # A mobile viewport/UA alone does not turn desktop Chromium into an
+        # Android device. Report observable platform conflicts rather than
+        # claiming the entire emulation matches the selected model.
+        desktop_platforms = {'Win32', 'Win64', 'MacIntel', 'Linux x86_64',
+                             'Linux i686', 'Linux x86'}
+        android_preset = 'Android' in expected['user_agent']
+        desktop_platform_with_mobile_ua = (
+            android_preset and observed['platform'] in desktop_platforms
+        )
+        comparisons['platformCompatible'] = not desktop_platform_with_mobile_ua
+
+        hints = observed['userAgentData']
+        if hints is not None:
+            comparisons['clientHintsMobile'] = hints['mobile'] is bool(expected['is_mobile'])
+            if android_preset:
+                comparisons['clientHintsPlatform'] = hints['platform'] == 'Android'
+
         warnings = [
             'Chromium no sistema operacional anfitrião; não é Android físico.',
             'WebGL e componentes multimídia são medidos, não falsificados.',
-            'Client Hints e plataforma podem divergir do User-Agent móvel.'
         ]
-        if observed['webdriver']:
-            warnings.append('navigator.webdriver expõe controle automatizado.')
+        if desktop_platform_with_mobile_ua:
+            warnings.append('User-Agent Android com navigator.platform de desktop: '
+                            'a emulação móvel não corresponde à plataforma real.')
+        if hints is None:
+            warnings.append('Client Hints indisponíveis; compatibilidade não verificada.')
+        elif not comparisons.get('clientHintsMobile', True) or not comparisons.get('clientHintsPlatform', True):
+            warnings.append('Client Hints observados divergem do dispositivo configurado.')
+        if observed['webdriver'] is True:
+            warnings.append('navigator.webdriver expõe controle automatizado do navegador.')
         if not all(comparisons.values()):
             warnings.append('Uma ou mais propriedades observadas divergem do preset.')
+        warnings.append('Este diagnóstico não mede nem prevê o Suspect Score de sites externos.')
         return {
             'configured': {'preset': snapshot['preset'], 'version': snapshot['version'],
                            'playwright_version': snapshot['playwright_version'],
                            'descriptor': expected},
             'observed': observed,
             'comparisons': comparisons,
+            'runtime_signals': {
+                'automation_exposed': observed['webdriver'] is True,
+                'desktop_platform_with_mobile_user_agent': desktop_platform_with_mobile_ua,
+                'client_hints_available': hints is not None,
+            },
             'consistent_for_tested_fields': all(comparisons.values()),
             'warnings': warnings,
             'limitations': ['HTTP Client Hints e IP externo não foram testados neste diagnóstico.',
-                            'GPU, Canvas, AudioContext, fontes e WebRTC não são emulados.'],
+                            'GPU, Canvas, AudioContext, fontes e WebRTC não são emulados.',
+                            'A compatibilidade da plataforma verifica nomes comuns de desktop, '
+                            'não a identidade física do aparelho.'],
         }
