@@ -13,7 +13,7 @@ const remote = fs.readFileSync(path.join(root, 'public', 'remote_browser.js'), '
 const page = fs.readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
 const deviceCatalog = JSON.parse(fs.readFileSync(path.join(root, 'public', 'device_catalog.json'), 'utf8'));
 const memory = new Map();
-let counter = 0;
+const {randomFillSync} = require('node:crypto');
 
 function browserStore() {
   const sandbox = {
@@ -22,10 +22,7 @@ function browserStore() {
       getItem: key => memory.get(key) ?? null,
       setItem: (key, value) => memory.set(key, value)
     },
-    crypto: {getRandomValues: bytes => {
-      for (let i = 0; i < bytes.length; i++) bytes[i] = (counter++ * 31) % 256;
-      return bytes;
-    }},
+    crypto: {getRandomValues: bytes => randomFillSync(bytes)},
     URL
   };
   vm.runInNewContext(source, sandbox, {filename: 'local_store.js'});
@@ -160,6 +157,7 @@ test('many registrations remain saved across panel reloads', () => {
   }
   const profiles = browserStore().request('state').profiles;
   assert.equal(profiles.length, 200);
+  assert.equal(new Set(profiles.map(profile => profile.id)).size, 200);
   assert.equal(profiles[0].name,'Conta 0');
   assert.equal(profiles[199].name,'Conta 199');
   assert.equal(profiles[0].device,'Galaxy S5');
