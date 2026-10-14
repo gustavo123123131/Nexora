@@ -109,6 +109,29 @@ class FingerprintSnapshotTests(unittest.TestCase):
             self.assertEqual(migrated['device'], 'Pixel 5')
             self.assertEqual(migrated['fingerprint']['reason'], 'legacy-migration')
 
+class RuntimeSessionStateTests(unittest.TestCase):
+    def test_concurrent_limit_does_not_restrict_saved_profiles(self):
+        from session_manager import SessionManager
+        sessions = SessionManager(max_open=2)
+        self.assertEqual(sessions.max_open, 2)
+        sessions.begin('profile-a', 0)
+        sessions.running('profile-a')
+        self.assertEqual(sessions.describe('profile-a', True)['status'], 'running')
+        self.assertIsNotNone(sessions.describe('profile-a', True)['started_at'])
+        sessions.begin('profile-b', 1)
+        sessions.running('profile-b')
+        with self.assertRaises(ValueError):
+            sessions.begin('profile-c', 2)
+        sessions.stopping('profile-a')
+        sessions.stopped('profile-a')
+        self.assertEqual(sessions.describe('profile-a', False)['status'], 'stopped')
+        sessions.begin('profile-c', 1)
+        sessions.error('profile-c', ValueError('private url must never be logged'))
+        details = sessions.describe('profile-c', False)
+        self.assertEqual(details['status'], 'error')
+        self.assertEqual(details['last_error_type'], 'ValueError')
+        self.assertNotIn('private url', str(details))
+
 class BrowserTests(unittest.TestCase):
     def test_mobile_cookie_isolation_and_persistence(self):
         fixture = ThreadingHTTPServer(('127.0.0.1', 0), WebFixture)
