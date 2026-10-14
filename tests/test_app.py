@@ -244,6 +244,21 @@ class BrowserTests(unittest.TestCase):
                     self.assertIn('timezone', report['observed'])
                     self.assertTrue(report['comparisons']['userAgent'])
                     self.assertTrue(report['comparisons']['touch'])
+                    self.assertTrue(report['comparisons']['viewportHeight'])
+                    self.assertIn('platformCompatible', report['comparisons'])
+                    self.assertEqual(
+                        report['runtime_signals']['automation_exposed'],
+                        report['observed']['webdriver'] is True)
+                    if report['observed']['platform'] in (
+                            'Win32', 'Win64', 'MacIntel', 'Linux x86_64',
+                            'Linux i686', 'Linux x86'):
+                        self.assertFalse(report['comparisons']['platformCompatible'])
+                        self.assertFalse(report['consistent_for_tested_fields'])
+                        self.assertTrue(
+                            report['runtime_signals']['desktop_platform_with_mobile_user_agent'])
+                    if report['observed']['userAgentData'] is not None:
+                        self.assertTrue(report['comparisons']['clientHintsMobile'])
+                        self.assertTrue(report['comparisons']['clientHintsPlatform'])
                     self.assertEqual(store.profile(profile['id'])['fingerprint'],
                                      stopped['configured'])
                 finally:
