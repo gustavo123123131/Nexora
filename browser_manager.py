@@ -63,7 +63,14 @@ class BrowserManager:
         if self.is_running(profile_id):
             return {'already_open': True, 'warning': None}
         pw = self._playwright()
-        device = pw.devices['Pixel 7']
+        from storage import validate_device
+        device_name = validate_device(profile.get('device'))
+        device = pw.devices[device_name]
+        if (device.get('default_browser_type') != 'chromium' or
+                not device.get('is_mobile') or not device.get('has_touch') or
+                'Android' not in device.get('user_agent', '') or
+                'Windows Phone' in device.get('user_agent', '')):
+            raise ValueError('Modelo Android não suportado pelo Chromium.')
         directory = self.store.profiles_dir / profile_id
         directory.mkdir(exist_ok=True)
         options = {key: value for key, value in device.items() if key != 'default_browser_type'}
