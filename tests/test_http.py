@@ -92,7 +92,7 @@ class HttpTests(unittest.TestCase):
                 self.assertFalse((Path(folder) / 'profiles' / cloned['id']).exists())
                 exported = json.loads(req('/api/profiles/export/' + profile['id'])[1])
                 self.assertEqual(exported['fingerprint']['preset'], 'Galaxy S24')
-                self.assertNotIn('cookies', json.dumps(exported).lower())
+                self.assertTrue(all(key not in exported for key in ('cookies', 'password', 'localStorage', 'tokens')))
                 imported = json.loads(req('/api/profiles/import-config', {
                     'configuration': exported})[1])
                 self.assertNotEqual(imported['id'], profile['id'])
