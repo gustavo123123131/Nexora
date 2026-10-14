@@ -73,6 +73,28 @@ class ChromiumRunnerTests(unittest.TestCase):
 
 
 
+class CatalogConsistencyTests(unittest.TestCase):
+    def test_catalog_comes_from_real_playwright_android_descriptors(self):
+        import json
+        from playwright.sync_api import sync_playwright
+        root = Path(__file__).resolve().parents[1]
+        web = json.loads((root / 'public/device_catalog.json').read_text('utf-8'))
+        local = json.loads((root / 'runner/device_catalog.json').read_text('utf-8'))
+        self.assertEqual(web, local)
+        self.assertEqual(web['devices'], list(runner_module.DEVICE_MODELS))
+        self.assertEqual(len(web['devices']), 50)
+        with sync_playwright() as playwright:
+            for name in web['devices']:
+                info = playwright.devices[name]
+                self.assertEqual(info['default_browser_type'], 'chromium', name)
+                self.assertTrue(info['is_mobile'], name)
+                self.assertTrue(info['has_touch'], name)
+                self.assertIn('Android', info['user_agent'], name)
+                options = runner_module.chromium_launch_options(playwright, name)
+                self.assertEqual(options['viewport'], info['viewport'])
+                self.assertEqual(options['device_scale_factor'], info['device_scale_factor'])
+
+
 class MultiDeviceChromiumTests(unittest.TestCase):
     """Real browser test: different devices, directories, cookies and storage."""
 
