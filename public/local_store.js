@@ -5,8 +5,25 @@
   'use strict';
   const KEY = 'nexora.site-profiles.v1';
   const HEX_ID = /^[a-f0-9]{32}$/;
-  const DEVICES = Object.freeze(['Pixel 7', 'Pixel 5', 'Galaxy S9+', 'Galaxy S5', 'Nexus 5']);
+  // Fast, offline-safe fallback; the full list is a checked-in manifest built
+  // from the exact Playwright version installed in the local Windows runner.
+  let DEVICES = Object.freeze(['Pixel 7', 'Pixel 5', 'Galaxy S9+', 'Galaxy S5', 'Nexus 5']);
   const DEFAULT_DEVICE = 'Pixel 7';
+  function configureDevices(manifest) {
+    const models = manifest?.devices;
+    if (manifest?.schema_version !== 1 || !Array.isArray(models) ||
+        models.length < 5 || models.length > 200 ||
+        models.some(m => typeof m !== 'string' || m.length > 80) ||
+        new Set(models).size !== models.length || !models.includes(DEFAULT_DEVICE))
+      throw new Error('Catálogo de dispositivos inválido.');
+    DEVICES = Object.freeze([...models]);
+    return DEVICES;
+  }
+  async function loadDevices() {
+    const response = await fetch('/device_catalog.json', {cache: 'no-store'});
+    if (!response.ok) throw new Error('Não foi possível carregar o catálogo de dispositivos.');
+    return configureDevices(await response.json());
+  }
   function device(value) {
     const chosen = value === undefined || value === null ? DEFAULT_DEVICE : value;
     if (typeof chosen !== 'string' || !DEVICES.includes(chosen))
@@ -57,7 +74,9 @@
   function state(data) {
     return {
       sites: data.sites,
-      profiles: data.profiles.map(p => ({ ...p, device: device(p.device), status: 'unavailable' })),
+      // Reading old profiles must not fail if the catalog is temporarily offline.
+      // New and edited values still require an approved Playwright model.
+      profiles: data.profiles.map(p => ({ ...p, device: p.device || DEFAULT_DEVICE, status: 'unavailable' })),
       capabilities: {
         mode: 'vercel', browser: false, storage: 'browser',
         reason: 'Cadastros guardados somente neste navegador. Nenhum executor remoto foi conectado.'
@@ -131,5 +150,9 @@
     }
     throw new Error('Operação não disponível.');
   }
-  globalThis.NexoraBrowserStore = Object.freeze({ request, devices: DEVICES, defaultDevice: DEFAULT_DEVICE });
+  globalThis.NexoraBrowserStore = Object.freeze({
+    request, loadDevices, configureDevices,
+    get devices() { return DEVICES; },
+    defaultDevice: DEFAULT_DEVICE
+  });
 })();
