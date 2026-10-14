@@ -100,6 +100,7 @@ function renderProfiles() {
     }
     if (localhostDeviceMode) {
       actions += `<button class="btn btn-ghost" data-action="inspect-profile" data-id="${profile.id}">Diagnóstico</button>`;
+      if (running) actions += `<button class="btn btn-ghost" data-action="save-window" data-id="${profile.id}" title="Salvar a posição atual desta janela para a próxima abertura">Salvar posição</button>`;
       if (!running) actions += `<button class="btn btn-ghost" data-action="duplicate-profile" data-id="${profile.id}">Duplicar</button><button class="btn btn-ghost" data-action="regenerate-profile" data-id="${profile.id}" title="Atualiza o snapshot oficial, não altera hardware real">Recriar preset</button>`;
     }
     const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
@@ -227,6 +228,8 @@ document.addEventListener('click', async event => {
   }
   const id = btn.dataset.id;
   if (localhostDeviceMode && action === 'inspect-profile') return openFingerprintInspector(id);
+  if (localhostDeviceMode && action === 'save-window')
+    return perform('windows/save-position', {id}, 'Posição da janela salva. Será restaurada na próxima abertura.');
   if (localhostDeviceMode && action === 'duplicate-profile') {
     if (confirm('Duplicar SOMENTE a configuração? O novo perfil terá armazenamento vazio, sem cookies nem logins copiados.'))
       return perform('profiles/duplicate', {id}, 'Novo perfil independente criado.');
