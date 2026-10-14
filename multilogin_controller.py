@@ -8,6 +8,7 @@ owned by BrowserManager. Never copy credentials between profiles.
 import math
 import os
 import re
+import time
 
 PROFILE_ID = re.compile(r'^[0-9a-f]{32}$')
 MAX_SELECTION = 12
@@ -44,10 +45,16 @@ class MultiLoginController:
         self.manager = manager
         self.store = manager.store
 
-    def start_selected(self, ids):
+    def start_selected(self, ids, interval_ms=0):
         ids = _validated_ids(ids, self.store)
+        if type(interval_ms) is not int or not 0 <= interval_ms <= 750:
+            raise ValueError('Intervalo entre aberturas deve estar entre 0 e 750 ms.')
         started, already_open, failures, warnings = [], [], {}, {}
-        for profile_id in ids:
+        for index, profile_id in enumerate(ids):
+            # Resource pacing only: never simulate mouse, clicks or typing.
+            # Playwright sync contexts must stay on the owner thread.
+            if index and interval_ms:
+                time.sleep(interval_ms / 1000)
             try:
                 result = self.manager.start(profile_id)
                 if result.get('already_open'):
