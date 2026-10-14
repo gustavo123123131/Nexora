@@ -54,11 +54,15 @@ class Handler(BaseHTTPRequestHandler):
             statuses = self.server.manager.status()
             return self.send_json(200, {
                 'sites': self.server.store.sites,
-                'profiles': [{**profile, 'status': statuses.get(profile['id'], 'stopped')}
+                'profiles': [{**profile, 'device': profile.get('device', 'Pixel 7'),
+                              'status': statuses.get(profile['id'], 'stopped')}
                              for profile in self.server.store.profiles]
             })
         files = {'/': ('index.html', 'text/html; charset=utf-8'),
                  '/app.js': ('app.js', 'application/javascript; charset=utf-8'),
+                 '/local_store.js': ('local_store.js', 'application/javascript; charset=utf-8'),
+                 '/remote_browser.js': ('remote_browser.js', 'application/javascript; charset=utf-8'),
+                 '/device_catalog.json': ('device_catalog.json', 'application/json; charset=utf-8'),
                  '/style.css': ('style.css', 'text/css; charset=utf-8')}
         if route not in files:
             return self.send_json(404, {'error': 'Não encontrado.'})
@@ -97,7 +101,13 @@ class Handler(BaseHTTPRequestHandler):
                 store.delete_site(body.get('id'))
                 data = {'ok': True}
             elif route == '/api/profiles/create':
-                data = store.create_profile(body.get('name'), body.get('site_id'))
+                data = store.create_profile(body.get('name'), body.get('site_id'), body.get('device'))
+            elif route == '/api/profiles/update':
+                profile_id = body.get('id')
+                if manager.is_running(profile_id):
+                    raise ValueError('Encerre o navegador antes de editar o perfil.')
+                data = store.update_profile(profile_id, body.get('name'),
+                                            body.get('site_id'), body.get('device'))
             elif route == '/api/profiles/delete':
                 profile_id = body.get('id')
                 manager.stop(profile_id)
