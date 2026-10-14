@@ -67,6 +67,48 @@ class LocalDeviceMetadataTests(unittest.TestCase):
             self.assertEqual(reloaded.profile(profiles[0]['id'])['device'], 'Pixel 7')
 
 
+class FingerprintSnapshotTests(unittest.TestCase):
+    def test_versioned_snapshot_is_stable_and_duplication_is_empty(self):
+        import json
+        from fingerprint_manager import FingerprintManager
+        with tempfile.TemporaryDirectory() as root:
+            store = Store(root)
+            site = store.create_site('Site', 'https://example.org')
+            a = store.create_profile('Conta A', site['id'], 'Galaxy S24')
+            snapshot = a['fingerprint']
+            self.assertEqual(snapshot['preset'], 'Galaxy S24')
+            self.assertEqual(snapshot['playwright_version'], '1.57.0')
+            self.assertTrue(FingerprintManager.migrate_version(snapshot)['compatible'])
+            b = store.duplicate_profile(a['id'])
+            self.assertNotEqual(a['id'], b['id'])
+            self.assertEqual(b['fingerprint']['preset'], 'Galaxy S24')
+            self.assertFalse((store.profiles_dir / b['id']).exists())
+            reloaded = Store(root)
+            self.assertEqual(reloaded.profile(a['id'])['fingerprint'], snapshot)
+            self.assertEqual(reloaded.profile(b['id'])['device'], 'Galaxy S24')
+            reloaded.regenerate_fingerprint(a['id'])
+            self.assertEqual(reloaded.profile(a['id'])['fingerprint']['reason'],
+                             'user-explicit-regeneration')
+            with self.assertRaises(ValueError):
+                FingerprintManager.validate(snapshot, 'Pixel 7')
+            with self.assertRaises(ValueError):
+                FingerprintManager.validate({'preset': 'unlisted'})
+
+    def test_old_profiles_migrate_without_changing_device_or_id(self):
+        import json
+        with tempfile.TemporaryDirectory() as root:
+            store = Store(root)
+            site = store.create_site('Site', 'https://example.org')
+            profile = store.create_profile('Original', site['id'], 'Pixel 5')
+            settings = store.path
+            record = json.loads(settings.read_text('utf-8'))
+            del record['profiles'][0]['fingerprint']
+            settings.write_text(json.dumps(record), encoding='utf-8')
+            migrated = Store(root).profile(profile['id'])
+            self.assertEqual(migrated['id'], profile['id'])
+            self.assertEqual(migrated['device'], 'Pixel 5')
+            self.assertEqual(migrated['fingerprint']['reason'], 'legacy-migration')
+
 class BrowserTests(unittest.TestCase):
     def test_mobile_cookie_isolation_and_persistence(self):
         fixture = ThreadingHTTPServer(('127.0.0.1', 0), WebFixture)
@@ -150,6 +192,39 @@ class BrowserTests(unittest.TestCase):
                 reloaded = Store(folder)
                 self.assertEqual(reloaded.profile(first['id'])['device'], 'Pixel 7')
                 self.assertEqual(reloaded.profile(second['id'])['device'], 'Galaxy S24')
+        finally:
+            fixture.shutdown()
+            fixture.server_close()
+
+    def test_inspector_reads_actual_properties_without_injecting(self):
+        fixture = ThreadingHTTPServer(('127.0.0.1', 0), WebFixture)
+        Thread(target=fixture.serve_forever, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as root:
+                store = Store(root)
+                site = store.create_site('Site',
+                    f'http://127.0.0.1:{fixture.server_address[1]}/')
+                profile = store.create_profile('Audit', site['id'], 'Pixel 7')
+                manager = BrowserManager(store, headless=True)
+                try:
+                    stopped = manager.inspect(profile['id'])
+                    self.assertFalse(stopped['running'])
+                    self.assertIsNone(stopped['observed'])
+                    manager.start(profile['id'])
+                    report = manager.inspect(profile['id'])
+                    self.assertTrue(report['running'])
+                    self.assertEqual(report['configured']['preset'], 'Pixel 7')
+                    self.assertIn('Android', report['observed']['userAgent'])
+                    self.assertIn('platform', report['observed'])
+                    self.assertIn('webdriver', report['observed'])
+                    self.assertIn('webgl', report['observed'])
+                    self.assertIn('timezone', report['observed'])
+                    self.assertTrue(report['comparisons']['userAgent'])
+                    self.assertTrue(report['comparisons']['touch'])
+                    self.assertEqual(store.profile(profile['id'])['fingerprint'],
+                                     stopped['configured'])
+                finally:
+                    manager.stop_all()
         finally:
             fixture.shutdown()
             fixture.server_close()
