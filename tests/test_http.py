@@ -68,6 +68,9 @@ class HttpTests(unittest.TestCase):
                 self.assertEqual(initial_state['sites'][0]['name'], 'Teste')
                 self.assertEqual(initial_state['profiles'][0]['status'], 'stopped')
                 self.assertEqual(initial_state['profiles'][0]['device'], 'Pixel 7')
+                sessions = json.loads(req('/api/sessions')[1])
+                self.assertGreaterEqual(sessions['max_simultaneous'], 1)
+                self.assertEqual(sessions['sessions'][0]['status'], 'stopped')
                 changed = json.loads(req('/api/profiles/update', {
                     'id':profile['id'], 'name':'Conta Alterada',
                     'site_id':site['id'], 'device':'Galaxy S24'})[1])
