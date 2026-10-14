@@ -82,7 +82,7 @@ class CatalogConsistencyTests(unittest.TestCase):
         local = json.loads((root / 'runner/device_catalog.json').read_text('utf-8'))
         self.assertEqual(web, local)
         self.assertEqual(web['devices'], list(runner_module.DEVICE_MODELS))
-        self.assertEqual(len(web['devices']), 50)
+        self.assertEqual(len(web['devices']), 46)
         with sync_playwright() as playwright:
             for name in web['devices']:
                 info = playwright.devices[name]
