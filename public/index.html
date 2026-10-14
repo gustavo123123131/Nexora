@@ -80,6 +80,15 @@
       <form id="modalForm"><div id="modalFields"></div><div class="form-actions"><button type="button" class="btn btn-secondary" id="modalCancel">Cancelar</button><button type="submit" class="btn btn-primary" id="modalSubmit">Salvar</button></div></form>
     </div>
   </div>
+  <div id="fingerprintModal" class="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fingerprintTitle">
+      <button id="fingerprintClose" class="icon-button modal-close" type="button" aria-label="Fechar inspeção">×</button>
+      <h2 id="fingerprintTitle">Diagnóstico do navegador</h2>
+      <p>Leitura real do Chromium quando o perfil está aberto. Não altera propriedades do navegador.</p>
+      <pre id="fingerprintReport" class="fingerprint-report" aria-live="polite"></pre>
+      <div class="form-actions"><button id="fingerprintDone" class="btn btn-secondary" type="button">Fechar</button></div>
+    </div>
+  </div>
   <section id="remoteViewer" class="remote-overlay" hidden aria-label="Navegador Chromium remoto">
     <div class="remote-window">
       <header class="remote-header">
