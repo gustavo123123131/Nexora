@@ -12,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 from storage import Store
 from browser_manager import BrowserManager
+from manual_browser_manager import ManualChromeManager
 from device_profile_manager import DeviceProfileManager
 
 ROOT = Path(__file__).resolve().parent
@@ -55,6 +56,7 @@ class Handler(BaseHTTPRequestHandler):
             statuses = self.server.manager.status()
             return self.send_json(200, {
                 'sites': self.server.store.sites,
+                'capabilities': {'browser': True, 'mode': self.server.manager.mode if hasattr(self.server.manager, 'mode') else 'playwright'},
                 'profiles': [{
                     **{k: v for k, v in profile.items() if k != 'fingerprint'},
                     'device': profile.get('device', 'Pixel 7'),
@@ -161,14 +163,19 @@ class LocalServer(HTTPServer):
     def __init__(self, port=PORT, data_dir=DATA, manager=None):
         super().__init__(('127.0.0.1', port), Handler)
         self.store = Store(data_dir)
-        self.manager = manager if manager is not None else BrowserManager(self.store)
+        if manager is not None:
+            self.manager = manager
+        elif os.environ.get('MULTILOGIN_BROWSER_MODE') == 'chrome-manual':
+            self.manager = ManualChromeManager(self.store)
+        else:
+            self.manager = BrowserManager(self.store)
         self.device_profiles = DeviceProfileManager(self.store, self.manager)
 
 
 def main():
     server = LocalServer()
     print('\n' + '=' * 52)
-    print(' MULTILOGIN MOBILE  |  Painel local')
+    print(' MULTILOGIN  |  Chrome manual' if getattr(server.manager, 'mode', None) == 'chrome-manual' else ' MULTILOGIN MOBILE  |  Painel local')
     print(f' Acesse: http://127.0.0.1:{PORT}')
     print(' Use Ctrl+C para encerrar e fechar os perfis.')
     print('=' * 52 + '\n', flush=True)
