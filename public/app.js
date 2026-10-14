@@ -5,6 +5,7 @@ let state = {sites:[], profiles:[]};
 let page = 'profiles';
 let busy = false;
 let toastTimer = null;
+let visibleProfileCount = 150; // Bound DOM cost; not a limit on saved profile records.
 let cloudMode = false;
 let browserAvailable = true;
 // Vercel defaults to passwordless browser-local metadata. Add ?storage=cloud to
@@ -71,7 +72,7 @@ function renderProfiles() {
     container.innerHTML = `<div class="empty-state"><div class="empty-art">▣</div><h3>Nenhum perfil por enquanto</h3><p>${state.sites.length ? 'Crie seu primeiro perfil para configurar uma conta independente.' : 'Primeiro cadastre um site. Depois crie perfis independentes.'}</p><button class="btn btn-primary" data-action="${state.sites.length ? 'add-profile' : 'add-site'}">${state.sites.length ? 'Criar primeiro perfil' : 'Cadastrar primeiro site'} →</button></div>`;
     return;
   }
-  container.innerHTML = state.profiles.map(profile => {
+  container.innerHTML = state.profiles.slice(0, visibleProfileCount).map(profile => {
     const site = state.sites.find(s => s.id === profile.site_id);
     const remoteReady = browserLocalMode && !!globalThis.NexoraRemote?.connected;
     const desktopReady = remoteReady && !!globalThis.NexoraRemote.desktop;
@@ -94,6 +95,14 @@ function renderProfiles() {
     const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
     return `<article class="profile-card"><div class="profile-icon">▣</div><div class="profile-info"><div class="card-heading"><h3>${escapeHTML(profile.name)}</h3><span class="status-badge ${badge}">${status}</span></div><div class="card-info">${escapeHTML(site?.name || 'Site não encontrado')} · ${escapeHTML(site?.url || '')}${browserLocalMode ? ' · ' + escapeHTML(profile.device || 'Pixel 7') : ''}</div></div><div class="card-actions">${actions}<button class="icon-button" data-action="delete-profile" data-id="${profile.id}" title="Excluir cadastro do perfil" aria-label="Excluir ${escapeHTML(profile.name)}">×</button></div></article>`;
   }).join('');
+  // Keep thousands of saved profiles manageable without rendering every
+  // card on every ten-second status refresh. No profile is discarded.
+  if (state.profiles.length > visibleProfileCount) {
+    const remaining = state.profiles.length - visibleProfileCount;
+    container.insertAdjacentHTML('beforeend',
+      '<button class="btn btn-secondary" data-action="show-more-profiles">Mostrar mais perfis (' +
+      remaining + ' restantes)</button>');
+  }
 }
 function renderSites() {
   const container = $('#siteList');
@@ -141,6 +150,11 @@ document.addEventListener('click', async event => {
   const btn = event.target.closest('[data-action]');
   if (!btn || busy) return;
   const action = btn.dataset.action;
+  if (action === 'show-more-profiles') {
+    visibleProfileCount += 150;
+    renderProfiles();
+    return;
+  }
   const id = btn.dataset.id;
   if (action === 'add-site') return openModal('site');
   if (action === 'add-profile') {
@@ -269,6 +283,8 @@ async function initialize() {
     cloudMode = true;
     browserAvailable = false;
     showApp();
+    try { await globalThis.NexoraBrowserStore.loadDevices(); }
+    catch (error) { console.warn('Catálogo offline: mantendo modelos básicos até reconectar.'); }
     await refresh();
     await globalThis.NexoraRemote?.initialize();
     return;
