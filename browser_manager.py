@@ -5,6 +5,7 @@ import re
 import json
 from pathlib import Path
 from playwright.sync_api import sync_playwright, Error as PlaywrightError
+from fingerprint_manager import FingerprintManager
 
 
 def _local_os_language():
@@ -101,23 +102,18 @@ class BrowserManager:
         if self.is_running(profile_id):
             return {'already_open': True, 'warning': None}
         pw = self._playwright()
-        from storage import validate_device
-        device_name = validate_device(profile.get('device'))
-        device = pw.devices[device_name]
-        if (device.get('default_browser_type') != 'chromium' or
-                not device.get('is_mobile') or not device.get('has_touch') or
-                'Android' not in device.get('user_agent', '') or
-                'Windows Phone' in device.get('user_agent', '')):
-            raise ValueError('Modelo Android não suportado pelo Chromium.')
+        fingerprint = FingerprintManager.validate(profile.get('fingerprint'),
+                                                  profile.get('device', 'Pixel 7'))
+        options = FingerprintManager.apply(pw, fingerprint)
+        viewport = options['viewport']
         directory = self.store.profiles_dir / profile_id
         directory.mkdir(exist_ok=True)
-        options = {key: value for key, value in device.items() if key != 'default_browser_type'}
         options.update(
             headless=self.headless,
             accept_downloads=True,
             # Follow the machine's locale and timezone instead of imposing
             # a different geographic environment on every local profile.
-            args=[f"--window-size={device['viewport']['width'] + 150},{device['viewport']['height'] + 155}"],
+            args=[f"--window-size={viewport['width'] + 150},{viewport['height'] + 155}"],
         )
         language = _local_os_language()
         if language:
@@ -151,6 +147,27 @@ class BrowserManager:
             raise
         finally:
             self.starting.discard(profile_id)
+
+    def inspect(self, profile_id):
+        profile = self.store.profile(profile_id)
+        if profile is None:
+            raise LookupError('Perfil não encontrado.')
+        snapshot = FingerprintManager.validate(profile.get('fingerprint'),
+                                               profile.get('device', 'Pixel 7'))
+        if not self.is_running(profile_id):
+            return {
+                'profile': {'id': profile_id, 'name': profile['name']},
+                'running': False,
+                'configured': snapshot,
+                'observed': None,
+                'comparisons': None,
+                'warnings': ['Abra o navegador do perfil para medir o fingerprint real.'],
+            }
+        result = FingerprintManager.inspect(self.contexts[profile_id],
+                                             snapshot, locale=_local_os_language())
+        result['profile'] = {'id': profile_id, 'name': profile['name']}
+        result['running'] = True
+        return result
 
     def stop(self, profile_id):
         context = self.contexts.pop(profile_id, None)
