@@ -1,0 +1,537 @@
+{
+  "schema_version": 1,
+  "source": "microsoft/playwright v1.57.0 deviceDescriptorsSource.json",
+  "playwright_version": "1.57.0",
+  "devices": {
+    "Galaxy A55": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; SM-A556B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 480,
+        "height": 1040
+      },
+      "device_scale_factor": 2.25,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy A55 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; SM-A556B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 1040,
+        "height": 480
+      },
+      "device_scale_factor": 2.25,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S24": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; SM-S921U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 360,
+        "height": 780
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S24 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; SM-S921U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 780,
+        "height": 360
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S5": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 5.0; SM-G900P Build/LRX21T) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S5 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 5.0; SM-G900P Build/LRX21T) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 640,
+        "height": 360
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S8": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 7.0; SM-G950U Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S8 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 7.0; SM-G950U Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 740,
+        "height": 360
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S9+": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; SM-G965U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 320,
+        "height": 658
+      },
+      "device_scale_factor": 4.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy S9+ landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; SM-G965U Build/R16NW) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 658,
+        "height": 320
+      },
+      "device_scale_factor": 4.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy Tab S4": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.1.0; SM-T837A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 712,
+        "height": 1138
+      },
+      "device_scale_factor": 2.25,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy Tab S4 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.1.0; SM-T837A) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 1138,
+        "height": 712
+      },
+      "device_scale_factor": 2.25,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy Tab S9": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 640,
+        "height": 1024
+      },
+      "device_scale_factor": 2.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Galaxy Tab S9 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 1024,
+        "height": 640
+      },
+      "device_scale_factor": 2.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "LG Optimus L70": {
+      "user_agent": "Mozilla/5.0 (Linux; U; Android 4.4.2; en-us; LGMS323 Build/KOT49I.MS32310c) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 384,
+        "height": 640
+      },
+      "device_scale_factor": 1.25,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "LG Optimus L70 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; U; Android 4.4.2; en-us; LGMS323 Build/KOT49I.MS32310c) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 640,
+        "height": 384
+      },
+      "device_scale_factor": 1.25,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Moto G4": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 7.0; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Moto G4 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 7.0; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 640,
+        "height": 360
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 10": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 10 Build/MOB31T) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 800,
+        "height": 1280
+      },
+      "device_scale_factor": 2,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 10 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 10 Build/MOB31T) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 1280,
+        "height": 800
+      },
+      "device_scale_factor": 2,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 4": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 4.4.2; Nexus 4 Build/KOT49H) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 384,
+        "height": 640
+      },
+      "device_scale_factor": 2,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 4 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 4.4.2; Nexus 4 Build/KOT49H) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 640,
+        "height": 384
+      },
+      "device_scale_factor": 2,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 5": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 360,
+        "height": 640
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 5 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 640,
+        "height": 360
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 5X": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; Nexus 5X Build/OPR4.170623.006) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 412,
+        "height": 732
+      },
+      "device_scale_factor": 2.625,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 5X landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; Nexus 5X Build/OPR4.170623.006) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 732,
+        "height": 412
+      },
+      "device_scale_factor": 2.625,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 6": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 7.1.1; Nexus 6 Build/N6F26U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 412,
+        "height": 732
+      },
+      "device_scale_factor": 3.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 6 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 7.1.1; Nexus 6 Build/N6F26U) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 732,
+        "height": 412
+      },
+      "device_scale_factor": 3.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 6P": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; Nexus 6P Build/OPP3.170518.006) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 412,
+        "height": 732
+      },
+      "device_scale_factor": 3.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 6P landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; Nexus 6P Build/OPP3.170518.006) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 732,
+        "height": 412
+      },
+      "device_scale_factor": 3.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 7": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 7 Build/MOB30X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 600,
+        "height": 960
+      },
+      "device_scale_factor": 2,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Nexus 7 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 6.0.1; Nexus 7 Build/MOB30X) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Safari/537.36",
+      "viewport": {
+        "width": 960,
+        "height": 600
+      },
+      "device_scale_factor": 2,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 2": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 411,
+        "height": 731
+      },
+      "device_scale_factor": 2.625,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 2 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0; Pixel 2 Build/OPD3.170816.012) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 731,
+        "height": 411
+      },
+      "device_scale_factor": 2.625,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 2 XL": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; Pixel 2 XL Build/OPD1.170816.004) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 411,
+        "height": 823
+      },
+      "device_scale_factor": 3.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 2 XL landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 8.0.0; Pixel 2 XL Build/OPD1.170816.004) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 823,
+        "height": 411
+      },
+      "device_scale_factor": 3.5,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 3": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 9; Pixel 3 Build/PQ1A.181105.017.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 393,
+        "height": 786
+      },
+      "device_scale_factor": 2.75,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 3 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 9; Pixel 3 Build/PQ1A.181105.017.A1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 786,
+        "height": 393
+      },
+      "device_scale_factor": 2.75,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 4": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; Pixel 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 353,
+        "height": 745
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 4 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 10; Pixel 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 745,
+        "height": 353
+      },
+      "device_scale_factor": 3,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 4a (5G)": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 4a (5G)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 412,
+        "height": 765
+      },
+      "screen": {
+        "width": 412,
+        "height": 892
+      },
+      "device_scale_factor": 2.63,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 4a (5G) landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 4a (5G)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 840,
+        "height": 312
+      },
+      "screen": {
+        "height": 892,
+        "width": 412
+      },
+      "device_scale_factor": 2.63,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 5": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 393,
+        "height": 727
+      },
+      "screen": {
+        "width": 393,
+        "height": 851
+      },
+      "device_scale_factor": 2.75,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 5 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 802,
+        "height": 293
+      },
+      "screen": {
+        "width": 851,
+        "height": 393
+      },
+      "device_scale_factor": 2.75,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 7": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 412,
+        "height": 839
+      },
+      "screen": {
+        "width": 412,
+        "height": 915
+      },
+      "device_scale_factor": 2.625,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    },
+    "Pixel 7 landscape": {
+      "user_agent": "Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.7499.4 Mobile Safari/537.36",
+      "viewport": {
+        "width": 863,
+        "height": 360
+      },
+      "screen": {
+        "width": 915,
+        "height": 412
+      },
+      "device_scale_factor": 2.625,
+      "is_mobile": true,
+      "has_touch": true,
+      "default_browser_type": "chromium"
+    }
+  }
+}
