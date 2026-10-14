@@ -65,9 +65,11 @@ class FingerprintManager:
         if version('playwright') != CATALOG['playwright_version']:
             raise ValueError('Playwright atualizado: revise o preset antes de regenerar.')
         descriptor = playwright.devices.get(snapshot['preset'])
-        if any(descriptor.get(key) != value
-               for key, value in snapshot['descriptor'].items()):
-            raise ValueError('Descritor em execução diferente do snapshot salvo.')
+        differences = [key for key, value in snapshot['descriptor'].items()
+                       if descriptor.get(key) != value]
+        if differences:
+            raise ValueError('Descritor em execução diferente do snapshot salvo: ' +
+                             ', '.join(differences))
         return {key: deepcopy(value) for key, value in descriptor.items()
                 if key != 'default_browser_type'}
 
