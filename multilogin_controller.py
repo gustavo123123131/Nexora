@@ -115,7 +115,7 @@ class MultiLoginController:
         tile_height = height // row_count
         if tile_width < 300 or tile_height < 300:
             raise ValueError('Não há espaço suficiente para organizar as janelas.')
-        arranged, errors = [], {}
+        arranged, errors, layout_warnings = [], {}, {}
         for index, pid in enumerate(running):
             context = self.manager.contexts[pid]
             session = None
@@ -133,6 +133,14 @@ class MultiLoginController:
                 session.send('Browser.setWindowBounds',
                              {'windowId': window_id, 'bounds': bounds})
                 arranged.append(pid)
+                layouts = getattr(self.manager, 'window_layouts', None)
+                if layouts is not None:
+                    try:
+                        layouts.save(pid, bounds)
+                    except Exception as exc:
+                        # The window was already positioned successfully.
+                        # Layout persistence is independent of browser control.
+                        layout_warnings[pid] = type(exc).__name__
             except Exception as exc:
                 errors[pid] = type(exc).__name__
             finally:
@@ -145,5 +153,6 @@ class MultiLoginController:
             'arranged': arranged,
             'not_running': [pid for pid in ids if pid not in running],
             'errors': errors,
+            'layout_warnings': layout_warnings,
             'columns': col_count,
         }
