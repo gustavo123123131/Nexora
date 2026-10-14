@@ -1,7 +1,10 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Nexora - Servidor Local (legado)
+rem Always use the installed Playwright Chromium (blue icon) for localhost profiles.
+rem Ignore any custom executable path that might point to colorful Google Chrome.
+set "MULTILOGIN_CHROMIUM_PATH="
+title Nexora - Chromium Local
 
 echo.
 echo ================================================
