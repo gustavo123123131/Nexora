@@ -13,6 +13,7 @@ from urllib.parse import unquote, urlsplit
 from storage import Store
 from browser_manager import BrowserManager
 from manual_browser_manager import ManualChromeManager
+from android_device_manager import AndroidDeviceManager
 from device_profile_manager import DeviceProfileManager
 
 ROOT = Path(__file__).resolve().parent
@@ -64,6 +65,13 @@ class Handler(BaseHTTPRequestHandler):
                     'status': statuses.get(profile['id'], 'stopped')
                 } for profile in self.server.store.profiles]
             })
+        if route == '/api/android/devices' and getattr(self.server.manager, 'mode', None) == 'android-real':
+            try:
+                return self.send_json(200, {'devices': self.server.manager.list_devices()})
+            except (FileNotFoundError, OSError) as exc:
+                return self.send_json(503, {'error': str(exc)})
+            except Exception:
+                return self.send_json(503, {'error': 'Falha ao consultar dispositivos Android.'})
         if route == '/api/sessions':
             return self.send_json(200, {
                 'sessions': self.server.manager.session_details(),
@@ -143,7 +151,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.server.device_profiles.delete(body.get('id'))
                 data = {'ok': True}
             elif route == '/api/profiles/start':
-                data = manager.start(body.get('id'))
+                if getattr(manager, 'mode', None) == 'android-real':
+                    data = manager.start(body.get('id'), body.get('serial'))
+                else:
+                    data = manager.start(body.get('id'))
             elif route == '/api/profiles/stop':
                 data = {'stopped': manager.stop(body.get('id'))}
             else:
@@ -167,6 +178,8 @@ class LocalServer(HTTPServer):
             self.manager = manager
         elif os.environ.get('MULTILOGIN_BROWSER_MODE') == 'chrome-manual':
             self.manager = ManualChromeManager(self.store)
+        elif os.environ.get('MULTILOGIN_BROWSER_MODE') == 'android-real':
+            self.manager = AndroidDeviceManager(self.store)
         else:
             self.manager = BrowserManager(self.store)
         self.device_profiles = DeviceProfileManager(self.store, self.manager)
@@ -175,7 +188,7 @@ class LocalServer(HTTPServer):
 def main():
     server = LocalServer()
     print('\n' + '=' * 52)
-    print(' MULTILOGIN  |  Chrome manual' if getattr(server.manager, 'mode', None) == 'chrome-manual' else ' MULTILOGIN MOBILE  |  Painel local')
+    print(' MULTILOGIN  |  Android conectado' if getattr(server.manager, 'mode', None) == 'android-real' else (' MULTILOGIN  |  Chrome manual' if getattr(server.manager, 'mode', None) == 'chrome-manual' else ' MULTILOGIN MOBILE  |  Painel local'))
     print(f' Acesse: http://127.0.0.1:{PORT}')
     print(' Use Ctrl+C para encerrar e fechar os perfis.')
     print('=' * 52 + '\n', flush=True)
