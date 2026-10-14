@@ -10,8 +10,10 @@ let cloudMode = false;
 let browserAvailable = true;
 // Vercel defaults to passwordless browser-local metadata. Add ?storage=cloud to
 // deliberately opt into the legacy authenticated PostgreSQL deployment.
-const browserLocalMode = !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname)
+const localhostDeviceMode = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+const browserLocalMode = !localhostDeviceMode
   && new URLSearchParams(location.search).get('storage') !== 'cloud';
+const supportsDeviceChoice = browserLocalMode || localhostDeviceMode;
 
 
 async function api(route, body) {
@@ -90,6 +92,7 @@ function renderProfiles() {
       actions = '<button class="btn btn-secondary" disabled>Navegador indisponível</button>';
     } else {
       actions = `<button class="btn ${running ? 'btn-secondary' : 'btn-primary'}" data-action="${running ? 'stop' : 'start'}" data-id="${profile.id}">${running ? '■ Encerrar' : '▶ Iniciar'}</button>`;
+      if (!running && supportsDeviceChoice) actions += `<button class="btn btn-ghost" data-action="edit-profile" data-id="${profile.id}">Editar perfil</button>`;
     }
     const status = unavailable ? '◌ Executor não conectado' : (running ? '● Em execução' : '○ Parado');
     const badge = unavailable ? 'unavailable' : (running ? 'running' : '');
@@ -120,7 +123,7 @@ function openModal(kind, item) {
   $('#modalSubmit').textContent = item ? 'Salvar alterações' : (isSite ? 'Adicionar site' : 'Criar perfil');
   $('#modalFields').innerHTML = isSite
     ? `<div class="field"><label for="fieldName">Nome do site</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Site principal" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldUrl">Endereço (URL)</label><input id="fieldUrl" name="url" type="url" maxlength="2048" placeholder="https://exemplo.com" required value="${escapeHTML(item?.url || '')}"><div class="field-note">Use http:// ou https:// no endereço.</div></div>`
-    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}" ${item?.site_id === site.id ? 'selected' : ''}>${escapeHTML(site.name)}</option>`).join('')}</select></div>${browserLocalMode ? `<div class="field"><label for="fieldDevice">Modelo de celular (emulação Chromium)</label><select id="fieldDevice" name="device" required>${globalThis.NexoraBrowserStore.devices.map(device => `<option value="${escapeHTML(device)}" ${(item?.device || 'Pixel 7') === device ? 'selected' : ''}>${escapeHTML(device)}</option>`).join('')}</select><div class="field-note">Modelo salvo individualmente. Não é Android real.</div></div>` : ''}`;
+    : `<div class="field"><label for="fieldName">Nome do perfil</label><input id="fieldName" name="name" type="text" maxlength="80" placeholder="Ex.: Conta 01" required value="${escapeHTML(item?.name || '')}"></div><div class="field"><label for="fieldSite">Site de destino</label><select id="fieldSite" name="site_id" required><option value="">Selecione um site</option>${state.sites.map(site => `<option value="${site.id}" ${item?.site_id === site.id ? 'selected' : ''}>${escapeHTML(site.name)}</option>`).join('')}</select></div>${supportsDeviceChoice ? `<div class="field"><label for="fieldDevice">Modelo de celular (emulação Chromium)</label><select id="fieldDevice" name="device" required>${globalThis.NexoraBrowserStore.devices.map(device => `<option value="${escapeHTML(device)}" ${(item?.device || 'Pixel 7') === device ? 'selected' : ''}>${escapeHTML(device)}</option>`).join('')}</select><div class="field-note">Modelo salvo individualmente. Não é Android real.</div></div>` : ''}`;
   $('#modalForm').dataset.kind = kind;
   $('#modalForm').dataset.id = item?.id || '';
   $('#fieldName').focus();
@@ -162,8 +165,10 @@ document.addEventListener('click', async event => {
     return openModal('profile');
   }
   if (action === 'edit-site') return openModal('site', state.sites.find(s => s.id === id));
-  if (action === 'edit-profile' && browserLocalMode) {
-    if (globalThis.NexoraRemote?.isRunning(id))
+  if (action === 'edit-profile' && supportsDeviceChoice) {
+    const profile = state.profiles.find(p => p.id === id);
+    if ((browserLocalMode && globalThis.NexoraRemote?.isRunning(id))
+      || (localhostDeviceMode && profile?.status === 'running'))
       return toast('Encerre o perfil antes de alterar seu dispositivo.', true);
     return openModal('profile', state.profiles.find(p => p.id === id));
   }
@@ -213,7 +218,7 @@ $('#modalForm').addEventListener('submit', async event => {
   const id = form.dataset.id;
   const name = $('#fieldName').value;
   const payload = kind === 'site' ? {name, url:$('#fieldUrl').value} : {name, site_id:$('#fieldSite').value};
-  if (kind === 'profile' && browserLocalMode) payload.device = $('#fieldDevice').value;
+  if (kind === 'profile' && supportsDeviceChoice) payload.device = $('#fieldDevice').value;
   const route = kind === 'site' ? (id ? 'sites/update':'sites/create') : (id ? 'profiles/update' : 'profiles/create');
   if (id) payload.id = id;
   const ok = await perform(route, payload, 'Salvo com sucesso.');
@@ -297,7 +302,12 @@ async function initialize() {
     await refresh();
   } catch (err) {
     // Old local server has no /api/auth/status. Keep the legacy mode usable.
-    if (err.status === 404) {showApp();await refresh();}
+    if (err.status === 404) {
+      showApp();
+      try { await globalThis.NexoraBrowserStore.loadDevices(); }
+      catch (_) { console.warn('Catálogo offline: modelos básicos disponíveis.'); }
+      await refresh();
+    }
     else showLogin(err.message);
   }
 }
