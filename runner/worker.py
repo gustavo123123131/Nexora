@@ -217,6 +217,13 @@ class BrowserWorker:
             self.contexts.pop(pid, None)
             return {'running': False}
 
+    def active_profiles(self, pw):
+        """One inexpensive status check for all running contexts.
+        Large catalogs must not generate one HTTP request per saved profile.
+        """
+        return [pid for pid in list(self.contexts)
+                if self.status(pw, pid)['running']]
+
     def _cookie_path(self, pid):
         return STORE / pid / '.nexora-session-cookies.json'
 
@@ -449,6 +456,14 @@ def health():
     return jsonify(ok=True, browser=True, mode='remote', desktop=DESKTOP_MODE,
                    devices=DEVICE_MODELS, default_device=DEFAULT_DEVICE,
                    max_profiles=MAX_PROFILES)
+
+
+@app.get('/v1/statuses')
+def statuses():
+    try:
+        return jsonify(running_ids=worker.run('active_profiles'))
+    except Exception:
+        return jsonify(error='Não foi possível consultar os perfis ativos.'), 503
 
 
 @app.get('/v1/status/<pid>')
