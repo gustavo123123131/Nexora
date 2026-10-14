@@ -59,6 +59,12 @@
             <article class="stat"><span class="stat-label">Sites vinculados</span><div><strong id="statSites">0</strong><span class="stat-icon blue">◎</span></div><small>Endereços disponíveis</small></article>
           </div>
           <div class="section-title"><div><h2>Lista de perfis</h2><span>Perfis independentes cadastrados</span></div><span class="helper" id="profileHelper"><i></i> Configurações independentes</span></div>
+          <div id="bulkActions" class="bulk-actions" hidden>
+            <span id="bulkSelectedCount">0 selecionados</span>
+            <button type="button" class="btn btn-primary" data-bulk-action="start">Abrir selecionados</button>
+            <button type="button" class="btn btn-ghost" data-bulk-action="arrange">Organizar janelas</button>
+            <button type="button" class="btn btn-secondary" data-bulk-action="stop">Encerrar selecionados</button>
+          </div>
           <div id="profileList" class="profiles-list"></div>
           <div class="info-line"><span class="info-icon">ⓘ</span> A hospedagem Vercel não executa navegadores Android ou Chromium persistentes. Para testar isolamento real de contas, precisaremos conectar um executor externo.</div>
         </section>
