@@ -34,6 +34,8 @@ jobs:
         run: cd runner && gunicorn --check-config worker:app
       - name: Compare browser environment before/after localization (no internet)
         run: python -m unittest discover -s tests -p test_browser_environment.py -v
+      - name: Localhost CRUD and multi-device browser integration
+        run: python -m unittest discover -s tests -p test_http.py -v && python -m unittest discover -s tests -p test_app.py -v
       - name: Real browser profile isolation and persistence
         run: python -m unittest discover -s tests -p test_runner_browser.py -v
       - name: Headed Chromium windows in a virtual desktop (Xvfb)
