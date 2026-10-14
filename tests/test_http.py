@@ -69,6 +69,9 @@ class HttpTests(unittest.TestCase):
                 self.assertEqual(initial_state['profiles'][0]['status'], 'stopped')
                 self.assertEqual(initial_state['profiles'][0]['device'], 'Pixel 7')
                 sessions = json.loads(req('/api/sessions')[1])
+                with self.assertRaises(urllib.error.HTTPError) as not_open:
+                    req('/api/windows/save-position', {'id': profile['id']})
+                self.assertEqual(not_open.exception.code, 400)
                 self.assertGreaterEqual(sessions['max_simultaneous'], 1)
                 self.assertEqual(sessions['sessions'][0]['status'], 'stopped')
                 # Selected-session endpoints are opt-in; they must not start
