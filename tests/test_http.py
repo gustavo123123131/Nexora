@@ -50,7 +50,7 @@ class HttpTests(unittest.TestCase):
                     self.fail('Servidor local não iniciou')
                 code, page, headers = req('/')
                 self.assertEqual(code, 200)
-                self.assertIn(b'MultiLogin Mobile', page)
+                self.assertIn(b'Nexora', page)
                 self.assertIn('text/html', headers.get('Content-Type'))
                 self.assertIn('application/javascript', req('/app.js')[2]['Content-Type'])
                 self.assertIn('text/css', req('/style.css')[2]['Content-Type'])
