@@ -2,7 +2,6 @@
 import json
 import os
 import re
-import shutil
 import signal
 import sys
 import threading
@@ -13,6 +12,7 @@ from urllib.parse import unquote, urlsplit
 
 from storage import Store
 from browser_manager import BrowserManager
+from device_profile_manager import DeviceProfileManager
 
 ROOT = Path(__file__).resolve().parent
 PUBLIC = ROOT / 'public'
@@ -67,6 +67,12 @@ class Handler(BaseHTTPRequestHandler):
                 'sessions': self.server.manager.session_details(),
                 'max_simultaneous': self.server.manager.sessions.max_open
             })
+        export_match = re.fullmatch(r'/api/profiles/export/([0-9a-f]{32})', route)
+        if export_match:
+            try:
+                return self.send_json(200, self.server.device_profiles.export_configuration(export_match.group(1)))
+            except (ValueError, LookupError) as exc:
+                return self.send_json(400, {'error': str(exc)})
         match = re.fullmatch(r'/api/profiles/inspect/([0-9a-f]{32})', route)
         if match:
             try:
@@ -119,30 +125,20 @@ class Handler(BaseHTTPRequestHandler):
                 store.delete_site(body.get('id'))
                 data = {'ok': True}
             elif route == '/api/profiles/create':
-                data = store.create_profile(body.get('name'), body.get('site_id'), body.get('device'))
+                data = self.server.device_profiles.create(
+                    body.get('name'), body.get('site_id'), body.get('device'))
             elif route == '/api/profiles/update':
-                profile_id = body.get('id')
-                if manager.is_running(profile_id):
-                    raise ValueError('Encerre o navegador antes de editar o perfil.')
-                data = store.update_profile(profile_id, body.get('name'),
-                                            body.get('site_id'), body.get('device'))
+                data = self.server.device_profiles.update(
+                    body.get('id'), body.get('name'), body.get('site_id'), body.get('device'))
             elif route == '/api/profiles/duplicate':
-                data = store.duplicate_profile(body.get('id'))
+                data = self.server.device_profiles.duplicate_configuration(body.get('id'))
+            elif route == '/api/profiles/import-config':
+                data = self.server.device_profiles.import_configuration(body.get('configuration'))
             elif route == '/api/profiles/regenerate':
-                profile_id = body.get('id')
-                if body.get('confirmed') is not True:
-                    raise ValueError('Confirme explicitamente a substituição da configuração.')
-                if manager.is_running(profile_id):
-                    raise ValueError('Encerre o navegador antes de regenerar.')
-                data = store.regenerate_fingerprint(profile_id)
+                data = self.server.device_profiles.regenerate(
+                    body.get('id'), confirmed=body.get('confirmed') is True)
             elif route == '/api/profiles/delete':
-                profile_id = body.get('id')
-                manager.stop(profile_id)
-                store.delete_profile(profile_id)
-                target = store.profiles_dir / profile_id
-                # ID obrigatório deve ter sido criado pelo próprio servidor.
-                if target.is_dir():
-                    shutil.rmtree(target)
+                self.server.device_profiles.delete(body.get('id'))
                 data = {'ok': True}
             elif route == '/api/profiles/start':
                 data = manager.start(body.get('id'))
@@ -166,6 +162,7 @@ class LocalServer(HTTPServer):
         super().__init__(('127.0.0.1', port), Handler)
         self.store = Store(data_dir)
         self.manager = manager if manager is not None else BrowserManager(self.store)
+        self.device_profiles = DeviceProfileManager(self.store, self.manager)
 
 
 def main():
